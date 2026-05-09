@@ -372,6 +372,24 @@ const sfx = {
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 const today = () => new Date().toISOString().split('T')[0];
+
+// Resize + compress image to base64 (max 800px, jpeg quality 0.7)
+async function fileToCompressedBase64(file, maxSize = 800, quality = 0.7) {
+  const img = await new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = rej;
+    im.src = URL.createObjectURL(file);
+  });
+  const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+  URL.revokeObjectURL(img.src);
+  return canvas.toDataURL('image/jpeg', quality);
+}
 function showToast(msg, type = 'success') {
   const div = document.createElement('div');
   div.className = `toast ${type}`;
@@ -412,6 +430,7 @@ async function loadUserData() {
   state.quizRecords = quiz.data || [];
   state.mealCheckins = meals.data || [];
   state.badges = badges.data || [];
+  checkBadgeEligibility();
 }
 
 async function loadTodayQuiz() {
@@ -467,29 +486,35 @@ async function submitQuiz(answerIdx) {
   state.quizRecords.push({ user_id: state.user.id, quiz_day: state.todayQuiz.day_number, is_correct: correct });
   if (correct) { sfx.correct(); await addXP(20); }
   else { sfx.wrong(); await addXP(5); }
+  checkBadgeEligibility();
   render();
 }
 
-async function checkIn(meal) {
+async function checkIn(meal, photoBase64) {
   const has = state.mealCheckins.find(c => c.checkin_date === today() && c.meal_type === meal);
   if (has) return showToast('已打過卡', 'error');
-  await sb.from('smr_meal_checkins').insert({ user_id: state.user.id, meal_type: meal, checkin_date: today() });
-  state.mealCheckins.push({ user_id: state.user.id, meal_type: meal, checkin_date: today() });
-  sfx.checkin(); showToast(`✓ ${meal === 'breakfast' ? '早餐' : meal === 'lunch' ? '午餐' : '晚餐'}打卡成功`);
+  if (!photoBase64) return showToast('請上傳餐點照片', 'error');
+  const { data, error } = await sb.from('smr_meal_checkins').insert({
+    user_id: state.user.id, meal_type: meal, checkin_date: today(), photo_url: photoBase64
+  }).select().single();
+  if (error) return showToast('打卡失敗', 'error');
+  state.mealCheckins.push(data);
+  sfx.checkin(); showToast(`✓ 午餐打卡成功`);
   await addXP(10);
-  await checkBadgeEligibility();
+  checkBadgeEligibility();
   render();
 }
 
-async function checkBadgeEligibility() {
+function checkBadgeEligibility() {
   const day = gameDay();
   const hasBadge = state.badges.find(b => b.day_number === day);
-  if (hasBadge) return;
-  const todayMeals = state.mealCheckins.filter(c => c.checkin_date === today());
+  if (hasBadge) { state.canClaimBadge = null; return; }
+  const lunchToday = state.mealCheckins.find(c => c.checkin_date === today() && c.meal_type === 'lunch');
   const todayQuizDone = state.quizRecords.find(q => q.quiz_day === day);
-  if (todayMeals.length >= 3 && todayQuizDone) {
-    // can claim
+  if (lunchToday && todayQuizDone) {
     state.canClaimBadge = day;
+  } else {
+    state.canClaimBadge = null;
   }
 }
 
@@ -521,6 +546,141 @@ async function submitBodyRecord(form) {
   showToast('✓ 數據已記錄');
   await addXP(15);
   state.page = 'records'; render();
+}
+
+// ============ AI ANALYSIS ============
+async function callGeminiAI(facePhoto, tonguePhoto, bodyData) {
+  const key = state.config?.ai_api_key;
+  if (!key) throw new Error('AI 金鑰未設定，請聯絡管理員');
+
+  const prompt = `你是一位精通中醫面診與舌診的養生顧問，具備長庚紀念醫院舌診研究室的專業知識。
+
+參考標準：
+- 長庚醫院舌診資料庫研究（CCMP96-RD-005）
+- 氣血虛體質看舌淡（PPV 80.24%）
+- 氣滯血瘀看苔薄（特異度 93.33%）
+- 陰虛看舌紅（靈敏度 53.33%）
+
+使用者身體數據：
+- 體重：${bodyData.weight} kg
+- 體脂率：${bodyData.body_fat}%
+- 肌肉量：${bodyData.muscle} kg
+- 內臟脂肪：${bodyData.visceral}
+
+請分析附上的面部照片（第一張）與舌診照片（第二張），結合身體數據，輸出純 JSON（無 markdown），格式：
+
+{
+  "faceZones": [
+    {"zone":"額頭","organ":"...","status":"正常|輕微失調|需注意"},
+    {"zone":"鼻部","organ":"...","status":"..."},
+    {"zone":"左頰","organ":"...","status":"..."},
+    {"zone":"右頰","organ":"...","status":"..."},
+    {"zone":"眼周","organ":"...","status":"..."},
+    {"zone":"下巴","organ":"...","status":"..."}
+  ],
+  "tongueAnalysis": [
+    {"item":"舌色","observation":"...","meaning":"中醫意義20-30字"},
+    {"item":"苔色","observation":"...","meaning":"..."},
+    {"item":"苔厚薄","observation":"...","meaning":"..."},
+    {"item":"舌形","observation":"...","meaning":"..."},
+    {"item":"濕潤度","observation":"...","meaning":"..."}
+  ],
+  "constitution": {"type":"陰虛|陽虛|氣虛|血虛|氣滯|血瘀|痰濕|正常","description":"50-80字","crossVerify":"30-50字"},
+  "nutrients": [
+    {"name":"營養素","reason":"20-30字","foods":"10-15字"},
+    {"name":"營養素","reason":"...","foods":"..."},
+    {"name":"營養素","reason":"...","foods":"..."}
+  ],
+  "dietAdvice": {
+    "eat": [
+      {"food":"...","reason":"15-25字"},
+      {"food":"...","reason":"..."},
+      {"food":"...","reason":"..."}
+    ],
+    "avoid": {"food":"...","reason":"15-25字"}
+  },
+  "acupoints": [
+    {"name":"穴位","location":"取穴位置","effect":"功效"},
+    {"name":"...","location":"...","effect":"..."},
+    {"name":"...","location":"...","effect":"..."}
+  ],
+  "lifestyle": ["建議1","建議2","建議3"],
+  "westernNotes": ["西醫提示1","提示2","提示3"]
+}
+
+繁體中文，養生參考非醫療診斷。`;
+
+  // strip data:image/jpeg;base64, prefix
+  const cleanBase64 = (s) => s.replace(/^data:image\/\w+;base64,/, '');
+
+  const body = {
+    contents: [{
+      parts: [
+        { text: prompt },
+        { inline_data: { mime_type: 'image/jpeg', data: cleanBase64(facePhoto) } },
+        { inline_data: { mime_type: 'image/jpeg', data: cleanBase64(tonguePhoto) } },
+      ]
+    }],
+    generationConfig: { temperature: 0.7, response_mime_type: 'application/json' }
+  };
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error('AI 呼叫失敗：' + err.slice(0, 200));
+  }
+  const json = await res.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('AI 回傳格式錯誤');
+  return JSON.parse(text);
+}
+
+async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
+  if (state.user.ai_used) return showToast('每帳號限用一次 AI 分析', 'error');
+  showToast('🔬 AI 分析中，請稍候 30 秒...', 'success');
+
+  try {
+    const report = await callGeminiAI(facePhoto, tonguePhoto, form);
+
+    // save to user
+    await sb.from('smr_users').update({
+      ai_used: true,
+      ai_report: report,
+      face_photo_url: facePhoto,
+      tongue_photo_url: tonguePhoto,
+    }).eq('id', state.user.id);
+
+    state.user.ai_used = true;
+    state.user.ai_report = report;
+    state.user.face_photo_url = facePhoto;
+    state.user.tongue_photo_url = tonguePhoto;
+
+    // also save body record
+    const rec = {
+      user_id: state.user.id,
+      weight: parseFloat(form.weight),
+      body_fat_pct: parseFloat(form.body_fat),
+      muscle_mass: parseFloat(form.muscle),
+      visceral_fat: parseInt(form.visceral),
+      recorded_date: today(),
+    };
+    const { data } = await sb.from('smr_body_records').upsert(rec, { onConflict: 'user_id,recorded_date' }).select().single();
+    if (data) {
+      const idx = state.bodyRecords.findIndex(r => r.recorded_date === today());
+      if (idx >= 0) state.bodyRecords[idx] = data; else state.bodyRecords.push(data);
+    }
+
+    sfx.levelup();
+    showToast('🎉 AI 完整分析完成！');
+    await addXP(50);
+    render();
+  } catch (e) {
+    showToast(e.message || 'AI 分析失敗', 'error');
+  }
 }
 
 // ============ HEALTH REPORT ============
@@ -656,19 +816,25 @@ const pages = {
         </div>
       </div>
 
-      <div class="card-cyber">
-        <div style="font-weight:700; margin-bottom:8px;">🍽️ 三餐打卡</div>
-        <div class="grid grid-cols-3 gap-2">
-          ${['breakfast','lunch','dinner'].map((m, i) => {
-            const done = todayMeals.find(c => c.meal_type === m);
-            const labels = ['早餐','午餐','晚餐'];
-            return `<button data-meal="${m}" class="quiz-opt" style="padding:10px; flex-direction:column; align-items:center; ${done?'opacity:0.6;':''}">
-              <div style="font-size:20px;">${done ? '✅' : ['🌅','☀️','🌙'][i]}</div>
-              <div style="font-size:11px; margin-top:2px;">${labels[i]}</div>
-            </button>`;
-          }).join('')}
-        </div>
-      </div>
+      ${(() => {
+        const lunchDone = todayMeals.find(c => c.meal_type === 'lunch');
+        if (lunchDone) {
+          return `<div class="card-cyber">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <div style="font-weight:700;">☀️ 午餐打卡</div>
+              <span style="color:#4caf50; font-weight:700; font-size:13px;">✓ 已完成 +10 XP</span>
+            </div>
+            ${lunchDone.photo_url ? `<img src="${lunchDone.photo_url}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; border:2px solid var(--blue);" />` : ''}
+          </div>`;
+        }
+        return `<div class="card-cyber">
+          <div style="font-weight:700; margin-bottom:8px;">☀️ 午餐打卡（每日一次）</div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-bottom:10px;">📸 上傳今日午餐照片即可打卡</div>
+          <input type="file" id="lunch-photo" accept="image/*" capture="environment" style="display:none;" />
+          <button class="btn-cyber" id="lunch-upload-btn" style="width:100%;">📷 拍照 / 選擇照片</button>
+          <div id="lunch-preview" style="margin-top:10px;"></div>
+        </div>`;
+      })()}
 
       ${canClaim ? `
         <button class="btn-primary pulse-glow" data-action="claim-badge" style="width:100%; margin-top:16px; padding:18px;">
@@ -699,7 +865,22 @@ const pages = {
 
   body: () => {
     const todayRec = state.bodyRecords.find(r => r.recorded_date === today());
-    if (todayRec) {
+    const aiUsed = state.user.ai_used;
+
+    // === 已用過 AI + 今日已記錄 → 顯示 AI 報告或基本報告 ===
+    if (todayRec && aiUsed) {
+      return `
+      <div style="padding:20px 16px;">
+        <h1 class="font-display glow-orange" style="font-size:28px;">BODY DATA</h1>
+        <div class="font-handwrite glow-blue" style="font-size:18px;">今日已記錄 ✓ · 查看 AI 完整報告</div>
+      </div>
+      ${aiReportCard(state.user.ai_report)}
+      ${reportCard(todayRec, state.bodyRecords[state.bodyRecords.indexOf(todayRec) - 1])}
+      `;
+    }
+
+    // === 今日已記錄但未用 AI → 顯示基本報告 + 提示可用 AI ===
+    if (todayRec && !aiUsed) {
       const prev = state.bodyRecords[state.bodyRecords.indexOf(todayRec) - 1];
       const r = generateReport(todayRec, prev);
       return `
@@ -707,13 +888,21 @@ const pages = {
         <h1 class="font-display glow-orange" style="font-size:28px;">BODY DATA</h1>
         <div class="font-handwrite glow-blue" style="font-size:18px;">今日已記錄 ✓</div>
       </div>
-      ${reportCard(todayRec, r)}
+      <div class="card-orange mx-4 mt-2 pulse-glow">
+        <div style="font-weight:900; color:#fff; font-size:16px;">🔬 AI 完整分析（限用一次）</div>
+        <div style="font-size:12px; opacity:0.9; margin-top:4px;">面診 + 舌診 + 體質判定 + 中醫養生建議</div>
+        <button class="btn-primary" data-nav-ai="1" style="width:100%; margin-top:10px;">立即使用 AI 分析</button>
+      </div>
+      ${reportCard(todayRec, prev)}
       `;
     }
+
+    // === 還沒記錄今天的數據 → 輸入表單 ===
     return `
     <div style="padding:20px 16px;">
       <h1 class="font-display glow-orange" style="font-size:28px;">BODY DATA</h1>
       <div class="font-handwrite glow-blue" style="font-size:18px;">今日身體數據 · ${today()}</div>
+      ${!aiUsed ? `<div style="font-size:11px; color:var(--orange); margin-top:6px;">✨ 首次輸入可使用 AI 完整分析（含面診/舌診）</div>` : ''}
     </div>
     <div class="px-4 mt-2">
       <div class="card-cyber">
@@ -734,7 +923,30 @@ const pages = {
             <label style="font-size:13px; color:#ffd166; font-weight:700;">🍔 內臟脂肪 (1-20)</label>
             <input class="input-cyber mt-1" name="visceral" type="number" min="1" max="20" placeholder="例：6" required />
           </div>
-          <button type="submit" class="btn-primary" style="margin-top:8px;">送出 · 立即產生報告</button>
+
+          ${!aiUsed ? `
+            <div style="border-top:1px dashed rgba(0,180,216,0.3); padding-top:14px; margin-top:4px;">
+              <div style="font-weight:700; color:var(--orange); font-size:14px; margin-bottom:8px;">🔬 AI 完整分析（選用，限一次）</div>
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <div>
+                  <label style="font-size:12px; color:var(--blue);">📷 面部照片（正面、自然光）</label>
+                  <input id="face-photo" type="file" accept="image/*" capture="user" class="input-cyber mt-1" style="padding:8px;" />
+                  <div id="face-preview"></div>
+                </div>
+                <div>
+                  <label style="font-size:12px; color:var(--blue);">👅 舌診照片（伸舌、自然光）</label>
+                  <input id="tongue-photo" type="file" accept="image/*" capture="user" class="input-cyber mt-1" style="padding:8px;" />
+                  <div id="tongue-preview"></div>
+                </div>
+              </div>
+              <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:8px;">⚠️ 兩張照片皆上傳才能進行 AI 分析；只填數據可跳過。</div>
+            </div>
+          ` : ''}
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button type="submit" class="btn-cyber" style="flex:1;">${aiUsed ? '送出基本報告' : '只送數據（跳過 AI）'}</button>
+            ${!aiUsed ? `<button type="button" id="ai-submit" class="btn-primary" style="flex:1;">🔬 AI 完整分析</button>` : ''}
+          </div>
         </form>
       </div>
     </div>
@@ -825,7 +1037,117 @@ const pages = {
   },
 };
 
+function aiReportCard(rep) {
+  if (!rep) return '';
+  const statusColor = (s) => s === '正常' ? '#4caf50' : s === '輕微失調' ? '#ffd166' : '#ff7c2a';
+  return `
+  <div class="card-cyber mx-4 mt-2 fade-in" style="border-color:var(--orange);">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:24px;">🔬</span>
+      <div class="font-display glow-orange" style="font-size:20px;">AI 中醫完整分析</div>
+    </div>
+    <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:2px;">面診 + 舌診 + 體質判定</div>
+
+    <div style="margin-top:14px; padding:12px; background:rgba(255,124,42,0.1); border-radius:10px; border:1px solid rgba(255,124,42,0.3);">
+      <div style="font-size:11px; color:var(--orange); font-weight:700;">🏷️ 體質類型</div>
+      <div class="font-display" style="font-size:24px; color:#fff; margin-top:2px;">${rep.constitution?.type || '—'}</div>
+      <div style="font-size:13px; line-height:1.5; opacity:0.9; margin-top:4px;">${rep.constitution?.description || ''}</div>
+      <div style="font-size:12px; line-height:1.5; opacity:0.7; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.15);">
+        <b>面舌互證：</b>${rep.constitution?.crossVerify || ''}
+      </div>
+    </div>
+  </div>
+
+  <div class="card-cyber mx-4 mt-2">
+    <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">👤 面部六區分析</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+      ${(rep.faceZones || []).map(z => `
+        <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${statusColor(z.status)};">
+          <div style="font-weight:700; font-size:13px;">${z.zone}</div>
+          <div style="font-size:11px; color:${statusColor(z.status)}; font-weight:700; margin-top:2px;">${z.status}</div>
+          <div style="font-size:11px; opacity:0.7; margin-top:2px; line-height:1.3;">${z.organ || ''}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  <div class="card-cyber mx-4 mt-2">
+    <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">👅 舌診五項</div>
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      ${(rep.tongueAnalysis || []).map(t => `
+        <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:700; font-size:13px;">${t.item}</span>
+            <span style="font-size:11px; color:var(--orange);">${t.observation}</span>
+          </div>
+          <div style="font-size:11px; opacity:0.75; line-height:1.4; margin-top:3px;">${t.meaning}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  <div class="card-cyber mx-4 mt-2">
+    <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">💊 個人化營養素建議</div>
+    ${(rep.nutrients || []).map(n => `
+      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; margin-bottom:6px;">
+        <div style="font-weight:700; color:var(--orange); font-size:13px;">${n.name}</div>
+        <div style="font-size:12px; line-height:1.5; margin-top:3px;">${n.reason}</div>
+        <div style="font-size:11px; opacity:0.7; margin-top:3px;">🥬 ${n.foods}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="card-cyber mx-4 mt-2">
+    <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">🍱 飲食建議</div>
+    <div style="font-size:12px; color:#4caf50; font-weight:700; margin-bottom:4px;">建議多吃</div>
+    ${(rep.dietAdvice?.eat || []).map(e => `
+      <div style="font-size:13px; padding:5px 8px; background:rgba(76,175,80,0.1); border-radius:6px; margin-bottom:4px;">
+        <b>${e.food}</b> · <span style="opacity:0.8;">${e.reason}</span>
+      </div>
+    `).join('')}
+    ${rep.dietAdvice?.avoid ? `
+      <div style="font-size:12px; color:#ff3d3d; font-weight:700; margin-top:8px; margin-bottom:4px;">⚠️ 應減少</div>
+      <div style="font-size:13px; padding:5px 8px; background:rgba(255,61,61,0.1); border-radius:6px;">
+        <b>${rep.dietAdvice.avoid.food}</b> · <span style="opacity:0.8;">${rep.dietAdvice.avoid.reason}</span>
+      </div>
+    ` : ''}
+  </div>
+
+  <div class="card-cyber mx-4 mt-2">
+    <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">🎯 養生穴位</div>
+    ${(rep.acupoints || []).map(a => `
+      <div style="background:rgba(0,180,216,0.08); padding:8px 10px; border-radius:8px; margin-bottom:6px;">
+        <div style="font-weight:700; color:var(--blue); font-size:13px;">📍 ${a.name}</div>
+        <div style="font-size:11px; opacity:0.7; margin-top:2px;">取穴：${a.location}</div>
+        <div style="font-size:12px; line-height:1.4; margin-top:3px;">${a.effect}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="card-cyber mx-4 mt-2">
+    <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">🌙 生活作息</div>
+    <ul style="padding-left:20px; line-height:1.7; font-size:13px;">
+      ${(rep.lifestyle || []).map(l => `<li>${l}</li>`).join('')}
+    </ul>
+  </div>
+
+  ${(rep.westernNotes || []).length ? `
+  <div class="card-cyber mx-4 mt-2" style="border-color:#ffd166;">
+    <div style="font-weight:700; color:#ffd166; margin-bottom:8px;">🩺 西醫觀察提示</div>
+    <ul style="padding-left:20px; line-height:1.7; font-size:13px; opacity:0.9;">
+      ${rep.westernNotes.map(n => `<li>${n}</li>`).join('')}
+    </ul>
+  </div>
+  ` : ''}
+
+  <div style="text-align:center; font-size:10px; color:rgba(255,255,255,0.3); margin:14px 16px 0;">
+    本報告為 AI 養生參考，非醫療診斷
+  </div>
+  `;
+}
+
 function reportCard(rec, r) {
+  if (!r) r = generateReport(rec, null);
   return `
   <div class="card-cyber mx-4 mt-2 fade-in">
     <div class="font-display glow-orange" style="font-size:20px;">📊 體組成報告</div>
@@ -1191,6 +1513,18 @@ function renderAdmin() {
         </div>
       </div>
 
+      <div class="card-cyber" style="margin-top:12px;">
+        <div style="font-weight:700;">🔬 AI 分析金鑰（Gemini）</div>
+        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">
+          前往 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue);">Google AI Studio</a> 取得免費金鑰
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input id="ad-aikey" type="password" class="input-cyber" value="${state.config?.ai_api_key || ''}" placeholder="貼上 API Key" />
+          <button class="btn-cyber" id="ad-save-aikey" style="white-space:nowrap;">儲存</button>
+        </div>
+        <button class="btn-cyber" id="ad-reset-aiused" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#ffd166,#ff7c2a); font-size:12px; padding:8px;">↻ 重置所有玩家 AI 使用次數</button>
+      </div>
+
       <button class="btn-cyber" id="ad-logout" style="width:100%; margin-top:16px;">登出後台</button>
     </div>
   `;
@@ -1220,6 +1554,17 @@ function renderAdmin() {
     await sb.from('smr_game_config').update({ registration_password: v }).eq('id', 1);
     showToast('✓ 密碼已更新');
     await loadConfig();
+  };
+  $('#ad-save-aikey').onclick = async () => {
+    const v = $('#ad-aikey').value.trim();
+    await sb.from('smr_game_config').update({ ai_api_key: v }).eq('id', 1);
+    showToast('✓ AI 金鑰已儲存');
+    await loadConfig();
+  };
+  $('#ad-reset-aiused').onclick = async () => {
+    if (!confirm('重置所有玩家的 AI 使用次數？這會讓所有人重新獲得 1 次免費 AI 分析機會')) return;
+    await sb.from('smr_users').update({ ai_used: false }).neq('id', '00000000-0000-0000-0000-000000000000');
+    showToast('✓ 已重置所有玩家 AI 使用次數');
   };
   $('#ad-quiz-import').onclick = openQuizImport;
   $('#ad-quiz-export').onclick = exportQuizMD;
@@ -1466,13 +1811,71 @@ function attachListeners() {
   $$('[data-rtab]').forEach(el => el.onclick = () => { state.recordTab = el.dataset.rtab; sfx.click(); render(); });
 
   if (state.page === 'rank') renderRankContent();
+
+  // Lunch photo upload
+  const lunchBtn = $('#lunch-upload-btn');
+  const lunchInput = $('#lunch-photo');
+  if (lunchBtn && lunchInput) {
+    let lunchBase64 = null;
+    lunchBtn.onclick = () => lunchInput.click();
+    lunchInput.onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        showToast('壓縮圖片中...');
+        lunchBase64 = await fileToCompressedBase64(f, 1000, 0.7);
+        $('#lunch-preview').innerHTML = `
+          <img src="${lunchBase64}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; border:2px solid var(--blue); margin-top:10px;" />
+          <button class="btn-primary" id="lunch-confirm" style="width:100%; margin-top:10px;">✓ 確認打卡</button>
+        `;
+        $('#lunch-confirm').onclick = () => checkIn('lunch', lunchBase64);
+      } catch { showToast('圖片處理失敗', 'error'); }
+    };
+  }
+
   if (state.page === 'body') {
     const f = $('#body-form');
+    let facePhoto = null, tonguePhoto = null;
+
+    const faceInput = $('#face-photo');
+    const tongueInput = $('#tongue-photo');
+    if (faceInput) {
+      faceInput.onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        facePhoto = await fileToCompressedBase64(file);
+        $('#face-preview').innerHTML = `<img src="${facePhoto}" style="width:80px; height:80px; object-fit:cover; border-radius:8px; margin-top:6px; border:2px solid var(--blue);" />`;
+      };
+    }
+    if (tongueInput) {
+      tongueInput.onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        tonguePhoto = await fileToCompressedBase64(file);
+        $('#tongue-preview').innerHTML = `<img src="${tonguePhoto}" style="width:80px; height:80px; object-fit:cover; border-radius:8px; margin-top:6px; border:2px solid var(--blue);" />`;
+      };
+    }
+
     if (f) f.onsubmit = (e) => {
       e.preventDefault();
       const fd = new FormData(f);
       submitBodyRecord(Object.fromEntries(fd));
     };
+
+    const aiBtn = $('#ai-submit');
+    if (aiBtn) aiBtn.onclick = () => {
+      const fd = new FormData(f);
+      const data = Object.fromEntries(fd);
+      if (!data.weight || !data.body_fat || !data.muscle || !data.visceral) return showToast('請完整填寫身體數據', 'error');
+      if (!facePhoto || !tonguePhoto) return showToast('請上傳面部與舌診照片', 'error');
+      runFullAIAnalysis(data, facePhoto, tonguePhoto);
+    };
+
+    // existing user clicked the "立即使用 AI 分析" button (no form, no data yet)
+    $$('[data-nav-ai]').forEach(el => el.onclick = () => {
+      // delete today record so user can re-input with AI
+      sb.from('smr_body_records').delete().eq('user_id', state.user.id).eq('recorded_date', today()).then(() => {
+        state.bodyRecords = state.bodyRecords.filter(r => r.recorded_date !== today());
+        render();
+      });
+    });
   }
 }
 
