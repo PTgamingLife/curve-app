@@ -683,36 +683,32 @@ async function callGeminiAI(facePhoto, tonguePhoto, bodyData) {
 async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
   if (state.user.ai_used) return showToast('每帳號限用一次 AI 分析', 'error');
 
-  // Show AI loading overlay
-  const overlay = document.createElement('div');
-  overlay.id = 'ai-overlay';
-  overlay.style.cssText = `
-    position:fixed; inset:0; z-index:998;
-    background:rgba(15,15,30,0.92); backdrop-filter:blur(8px);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:24px; text-align:center;
-  `;
-  overlay.innerHTML = `
-    <div class="font-display glow-orange" style="font-size:32px; margin-bottom:8px;">AI ANALYZING</div>
-    <div class="font-handwrite glow-blue" style="font-size:22px; margin-bottom:24px;">中醫智能分析啟動中...</div>
-    <div class="spinner" style="margin-bottom:20px;"></div>
-    <div id="ai-status" style="min-height:60px; max-width:340px;">
-      <div style="text-align:center; color:rgba(255,255,255,0.7);">準備中...</div>
-    </div>
-    <div style="margin-top:24px; font-size:11px; color:rgba(255,255,255,0.4); max-width:300px; line-height:1.5;">
-      📸 正在分析面部六區與舌診五項<br>
-      🔬 比對體質資料庫（CCMP96-RD-005）<br>
-      💊 生成個人化中醫養生建議
-    </div>
-  `;
-  document.body.appendChild(overlay);
+  showQueueOverlay();
 
+  let queueId = null;
   try {
-    // 進場抖動：隨機 0-3 秒，自然分散尖峰時段的同時湧入
-    const initialJitter = Math.random() * 3000;
-    setAIStatus(`<div style="color:var(--blue); text-align:center;">📡 連線 Gemini AI...</div>`);
-    await new Promise(r => setTimeout(r, initialJitter));
+    // 1. 加入排隊
+    const { data: q } = await sb.from('smr_ai_queue').insert({ user_id: state.user.id, status: 'waiting' }).select().single();
+    queueId = q.id;
 
+    // 2. 輪詢排隊狀態，直到輪到自己
+    while (true) {
+      const { data: status } = await sb.rpc('smr_queue_status', { queue_id: queueId });
+      const myPos = status?.[0]?.queue_pos || 1;
+      const processing = status?.[0]?.processing_count || 0;
+      updateQueueUI(myPos, processing);
+
+      if (myPos === 1) {
+        const { data: dispatched } = await sb.rpc('smr_try_dispatch', { queue_id: queueId });
+        if (dispatched) break;
+      }
+      // 輪詢間隔：位置越前越頻繁
+      const waitMs = myPos <= 3 ? 1500 : myPos <= 10 ? 2500 : 4000;
+      await new Promise(r => setTimeout(r, waitMs));
+    }
+
+    // 3. 切換至 AI 處理動畫
+    transitionToProcessing();
     const report = await callGeminiAI(facePhoto, tonguePhoto, form);
 
     // save to user
@@ -743,15 +739,218 @@ async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
       if (idx >= 0) state.bodyRecords[idx] = data; else state.bodyRecords.push(data);
     }
 
+    // 4. 標記完成
+    if (queueId) await sb.from('smr_ai_queue').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', queueId);
+
     sfx.levelup();
     document.getElementById('ai-overlay')?.remove();
     showToast('🎉 AI 完整分析完成！');
     await addXP(50);
     render();
   } catch (e) {
+    if (queueId) await sb.from('smr_ai_queue').update({ status: 'failed', completed_at: new Date().toISOString() }).eq('id', queueId);
     document.getElementById('ai-overlay')?.remove();
     showToast(e.message || 'AI 分析失敗', 'error');
   }
+}
+
+// ============ 排隊動畫 UI ============
+function humanoidSVG(color, delay = 0, isMe = false) {
+  return `
+  <svg viewBox="0 0 60 100" style="
+    width:36px; height:60px;
+    animation: hop 0.7s ${delay}s ease-in-out infinite alternate;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)) ${isMe ? 'drop-shadow(0 0 10px ' + color + ')' : ''};
+    flex-shrink:0;
+  ">
+    <circle cx="30" cy="14" r="9" fill="${color}"/>
+    <rect x="22" y="24" width="16" height="32" rx="5" fill="${color}"/>
+    <rect x="20" y="56" width="6" height="28" rx="3" fill="${color}"/>
+    <rect x="34" y="56" width="6" height="28" rx="3" fill="${color}"/>
+    <rect x="14" y="28" width="6" height="22" rx="3" fill="${color}"/>
+    <rect x="40" y="28" width="6" height="22" rx="3" fill="${color}"/>
+    ${isMe ? `<circle cx="30" cy="14" r="11" fill="none" stroke="${color}" stroke-width="2" opacity="0.6"><animate attributeName="r" values="11;16;11" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.6;0;0.6" dur="1.5s" repeatCount="indefinite"/></circle>` : ''}
+  </svg>`;
+}
+
+function showQueueOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'ai-overlay';
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:998;
+    background: radial-gradient(ellipse at center, #1a1a4a 0%, #0a0a1e 70%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:20px; overflow:hidden;
+  `;
+  overlay.innerHTML = `
+    <style>
+      @keyframes hop {
+        0% { transform: translateY(0) scaleY(1); }
+        40% { transform: translateY(-18px) scaleY(1.05); }
+        100% { transform: translateY(0) scaleY(0.95); }
+      }
+      @keyframes portal-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes portal-pulse {
+        0%, 100% { transform: scale(1); opacity: 0.9; }
+        50% { transform: scale(1.05); opacity: 1; }
+      }
+      @keyframes star-twinkle {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+      @keyframes line-march {
+        from { transform: translateX(0); }
+        to { transform: translateX(-46px); }
+      }
+      .portal-bg {
+        position: absolute;
+        width: 240px; height: 240px;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, transparent, #ff7c2a, #00b4d8, #ff3d9a, transparent, transparent);
+        filter: blur(20px);
+        animation: portal-spin 6s linear infinite;
+        opacity: 0.6;
+      }
+      .portal-ring {
+        position: relative;
+        width: 160px; height: 160px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(0,180,216,0.3) 0%, rgba(255,124,42,0.2) 60%, transparent 100%);
+        border: 3px solid rgba(255,124,42,0.6);
+        box-shadow: 0 0 60px #ff7c2a, inset 0 0 30px #00b4d8;
+        animation: portal-pulse 2s ease-in-out infinite;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .portal-core {
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff 0%, #00b4d8 30%, #1a1a4a 80%);
+        animation: portal-spin 3s linear infinite;
+        box-shadow: 0 0 40px #00b4d8;
+      }
+      .star {
+        position: absolute;
+        width: 3px; height: 3px;
+        background: #fff;
+        border-radius: 50%;
+        animation: star-twinkle 2s infinite;
+      }
+    </style>
+
+    <!-- 星空背景 -->
+    ${Array.from({length: 30}).map(() => `<div class="star" style="top:${Math.random()*100}%; left:${Math.random()*100}%; animation-delay:${Math.random()*2}s;"></div>`).join('')}
+
+    <!-- 標題 -->
+    <div style="text-align:center; margin-bottom:20px; z-index:2;">
+      <div class="font-display glow-orange" style="font-size:30px; line-height:1;">AI PORTAL</div>
+      <div class="font-handwrite glow-blue" style="font-size:18px; margin-top:2px;">中醫智能傳送門</div>
+    </div>
+
+    <!-- 傳送門 + 排隊區域 -->
+    <div style="position:relative; width:100%; max-width:420px; height:200px; display:flex; align-items:center; justify-content:center; z-index:2;">
+      <!-- 傳送門（左側） -->
+      <div style="position:absolute; left:8px; top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center;">
+        <div class="portal-bg"></div>
+        <div class="portal-ring">
+          <div class="portal-core"></div>
+        </div>
+      </div>
+
+      <!-- 排隊人偶（從傳送門右側往右排） -->
+      <div id="queue-line" style="
+        position:absolute; left:170px; right:8px; bottom:30px;
+        display:flex; align-items:flex-end; gap:8px; padding:0 8px;
+        overflow:hidden;
+      "></div>
+    </div>
+
+    <!-- 狀態資訊 -->
+    <div id="queue-info" style="margin-top:16px; text-align:center; z-index:2; min-height:80px;">
+      <div class="font-display glow-blue" style="font-size:22px;">CONNECTING...</div>
+      <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:6px;">準備加入排隊</div>
+    </div>
+
+    <div id="ai-status" style="display:none;"></div>
+
+    <div style="margin-top:24px; font-size:10px; color:rgba(255,255,255,0.35); max-width:320px; text-align:center; line-height:1.5; z-index:2;">
+      📸 智能識別面部六區與舌診五項<br>
+      🔬 比對長庚舌診資料庫 CCMP96-RD-005<br>
+      💊 生成個人化中醫養生建議
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function updateQueueUI(myPos, processing) {
+  const info = document.getElementById('queue-info');
+  const line = document.getElementById('queue-line');
+  if (!info || !line) return;
+
+  // 顯示我前面 + 我自己 + 後面，最多 8 個人偶
+  const colors = ['#ff7c2a','#00b4d8','#ff3d9a','#ffd166','#5fdfff','#ff9a5a','#a78bfa','#4ade80'];
+  const total = Math.min(myPos + 2, 8);
+  let figures = '';
+  for (let i = 0; i < total; i++) {
+    const isMe = (i === myPos - 1);
+    const color = isMe ? '#ff7c2a' : colors[i % colors.length];
+    figures += humanoidSVG(color, i * 0.15, isMe);
+  }
+  line.innerHTML = figures;
+
+  let icon = '⏳', msg, sub;
+  if (myPos === 1) {
+    icon = '🚀'; msg = '即將傳送'; sub = '正在取得執行 slot...';
+  } else if (myPos <= 5) {
+    msg = `排隊位置 #${myPos}`; sub = `預計等待 ${(myPos-1)*5} 秒`;
+  } else if (myPos <= 15) {
+    msg = `排隊位置 #${myPos}`; sub = `預計等待 ${Math.round((myPos-1)*4.5)} 秒`;
+  } else {
+    msg = `排隊位置 #${myPos}`; sub = `預計等待 ${Math.round((myPos-1)*4)} 秒（系統繁忙）`;
+  }
+
+  info.innerHTML = `
+    <div class="font-display glow-orange" style="font-size:28px;">${icon} ${msg}</div>
+    <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-top:4px;">${sub}</div>
+    <div style="font-size:11px; color:var(--blue); margin-top:6px;">⚡ 系統處理中：${processing} 人</div>
+  `;
+}
+
+function transitionToProcessing() {
+  const info = document.getElementById('queue-info');
+  const line = document.getElementById('queue-line');
+  if (!info || !line) return;
+
+  // 我的人偶走進傳送門
+  line.innerHTML = `<svg viewBox="0 0 60 100" style="
+    width:46px; height:76px;
+    animation: enter-portal 1.4s ease-in forwards;
+    filter: drop-shadow(0 0 16px #ff7c2a);
+  ">
+    <circle cx="30" cy="14" r="9" fill="#ff7c2a"/>
+    <rect x="22" y="24" width="16" height="32" rx="5" fill="#ff7c2a"/>
+    <rect x="20" y="56" width="6" height="28" rx="3" fill="#ff7c2a"/>
+    <rect x="34" y="56" width="6" height="28" rx="3" fill="#ff7c2a"/>
+    <rect x="14" y="28" width="6" height="22" rx="3" fill="#ff7c2a"/>
+    <rect x="40" y="28" width="6" height="22" rx="3" fill="#ff7c2a"/>
+  </svg>
+  <style>
+    @keyframes enter-portal {
+      0% { transform: translateX(0) scale(1); opacity: 1; }
+      60% { transform: translateX(-180px) scale(0.6); opacity: 0.8; }
+      100% { transform: translateX(-220px) scale(0.1); opacity: 0; }
+    }
+  </style>`;
+
+  setTimeout(() => {
+    info.innerHTML = `
+      <div class="font-display glow-orange" style="font-size:28px;">🔬 ANALYZING</div>
+      <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-top:4px;">AI 正在掃描中...</div>
+      <div id="ai-status" style="margin-top:8px; min-height:40px;"></div>
+    `;
+  }, 1400);
 }
 
 // ============ HEALTH REPORT ============
