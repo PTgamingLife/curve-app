@@ -1171,9 +1171,24 @@ function renderAdmin() {
       </div>
 
       <div class="card-cyber" style="margin-top:12px;">
-        <div style="font-weight:700;">📚 題庫管理</div>
-        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">當前 Day ${gameDay()} 題目</div>
-        <div id="ad-quiz" style="margin-top:8px;"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:700;">📚 題庫管理</div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn-cyber" id="ad-quiz-import" style="font-size:12px; padding:6px 12px;">📋 批次匯入</button>
+            <button class="btn-cyber" id="ad-quiz-export" style="font-size:12px; padding:6px 12px;">📤 匯出 MD</button>
+          </div>
+        </div>
+        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">點擊任一天進行編輯 · 共 28 天</div>
+        <div id="ad-quiz-grid" style="margin-top:12px; display:grid; grid-template-columns:repeat(7,1fr); gap:6px;"></div>
+        <div id="ad-quiz-editor" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card-cyber" style="margin-top:12px;">
+        <div style="font-weight:700;">⚙️ 註冊密碼</div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input id="ad-regpwd" type="text" class="input-cyber" value="${state.config?.registration_password || ''}" />
+          <button class="btn-cyber" id="ad-save-regpwd" style="white-space:nowrap;">儲存</button>
+        </div>
       </div>
 
       <button class="btn-cyber" id="ad-logout" style="width:100%; margin-top:16px;">登出後台</button>
@@ -1199,7 +1214,19 @@ function renderAdmin() {
     showToast('✓ 已重置比賽');
   };
   $('#ad-logout').onclick = () => { state.adminAuthed = false; state.page = 'login'; render(); };
+  $('#ad-save-regpwd').onclick = async () => {
+    const v = $('#ad-regpwd').value.trim();
+    if (!v) return showToast('密碼不能為空', 'error');
+    await sb.from('smr_game_config').update({ registration_password: v }).eq('id', 1);
+    showToast('✓ 密碼已更新');
+    await loadConfig();
+  };
+  $('#ad-quiz-import').onclick = openQuizImport;
+  $('#ad-quiz-export').onclick = exportQuizMD;
 }
+
+let allQuestions = [];
+const todayDay = () => gameDay();
 
 async function loadAdminData() {
   const { data: users } = await sb.from('smr_users').select('*').order('xp', { ascending: false });
@@ -1212,19 +1239,218 @@ async function loadAdminData() {
     </div>
   `).join('') || '<div style="color:rgba(255,255,255,0.4);">尚無玩家</div>';
 
-  const day = gameDay();
-  const { data: q } = await sb.from('smr_quiz_questions').select('*').eq('day_number', day).maybeSingle();
-  if (q) {
-    $('#ad-quiz').innerHTML = `
-      <div style="font-size:13px; padding:8px; background:rgba(0,0,0,0.4); border-radius:8px;">
-        <div style="font-weight:700; margin-bottom:4px;">Day ${q.day_number}: ${q.question}</div>
-        <div style="opacity:0.7;">A. ${q.option_a}<br>B. ${q.option_b}<br>C. ${q.option_c}<br>D. ${q.option_d}</div>
-        <div style="color:var(--orange); margin-top:4px;">正解：${['A','B','C','D'][q.answer_index]}</div>
+  await loadQuizGrid();
+}
+
+async function loadQuizGrid() {
+  const { data } = await sb.from('smr_quiz_questions').select('*').order('day_number');
+  allQuestions = data || [];
+  const today = todayDay();
+
+  $('#ad-quiz-grid').innerHTML = Array.from({ length: 28 }).map((_, i) => {
+    const day = i + 1;
+    const has = allQuestions.find(q => q.day_number === day);
+    const isToday = day === today;
+    return `<button class="ad-day-cell" data-day="${day}" style="
+      aspect-ratio:1; border-radius:8px;
+      border:2px solid ${isToday ? 'var(--orange)' : has ? 'rgba(0,180,216,0.5)' : 'rgba(255,255,255,0.1)'};
+      background:${has ? 'rgba(0,180,216,0.15)' : 'rgba(0,0,0,0.4)'};
+      color:${has ? '#fff' : 'rgba(255,255,255,0.4)'};
+      cursor:pointer; font-family:'Bangers',sans-serif; font-size:14px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      ${isToday ? 'box-shadow:0 0 12px var(--orange);' : ''}
+    ">
+      <div>${day}</div>
+      <div style="font-size:10px;">${has ? '✓' : '—'}</div>
+    </button>`;
+  }).join('');
+
+  $$('.ad-day-cell').forEach(el => {
+    el.onclick = () => openQuizEditor(parseInt(el.dataset.day));
+  });
+
+  $('#ad-quiz-editor').innerHTML = '';
+}
+
+function openQuizEditor(day) {
+  const q = allQuestions.find(x => x.day_number === day);
+  const isNew = !q;
+  const data = q || { day_number: day, question: '', option_a: '', option_b: '', option_c: '', option_d: '', answer_index: 0, explanation: '' };
+
+  $('#ad-quiz-editor').innerHTML = `
+    <div class="card-cyber" style="background:rgba(0,0,0,0.6); border-color:var(--orange);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div class="font-display glow-orange" style="font-size:20px;">DAY ${day} ${isNew ? '· 新增' : '· 編輯'}</div>
+        <button id="ad-q-close" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:20px; cursor:pointer;">✕</button>
       </div>
-    `;
-  } else {
-    $('#ad-quiz').innerHTML = `<div style="color:rgba(255,255,255,0.4); font-size:13px;">Day ${day} 尚無題目</div>`;
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div>
+          <label style="font-size:11px; color:var(--blue); font-weight:700;">問題</label>
+          <textarea id="q-question" class="input-cyber" rows="2" style="resize:vertical; margin-top:4px;">${data.question}</textarea>
+        </div>
+
+        ${['a','b','c','d'].map((k, i) => `
+          <div style="display:flex; gap:8px; align-items:center;">
+            <label style="font-size:11px; width:50px; color:${data.answer_index === i ? '#4caf50' : 'var(--blue)'}; font-weight:700;">
+              <input type="radio" name="ans" value="${i}" ${data.answer_index === i ? 'checked' : ''} style="margin-right:4px;"/>
+              ${k.toUpperCase()}
+            </label>
+            <input id="q-opt-${k}" class="input-cyber" value="${data['option_' + k]}" style="flex:1;" />
+          </div>
+        `).join('')}
+
+        <div>
+          <label style="font-size:11px; color:var(--blue); font-weight:700;">解析（選填）</label>
+          <textarea id="q-explain" class="input-cyber" rows="2" style="resize:vertical; margin-top:4px;">${data.explanation || ''}</textarea>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button class="btn-primary" id="q-save" style="flex:1;">${isNew ? '新增題目' : '儲存變更'}</button>
+          ${!isNew ? `<button class="btn-cyber" id="q-delete" style="background:linear-gradient(135deg,#ff3d3d,#ff7c2a);">🗑️</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  $('#ad-q-close').onclick = () => { $('#ad-quiz-editor').innerHTML = ''; };
+  $('#q-save').onclick = async () => {
+    const payload = {
+      day_number: day,
+      question: $('#q-question').value.trim(),
+      option_a: $('#q-opt-a').value.trim(),
+      option_b: $('#q-opt-b').value.trim(),
+      option_c: $('#q-opt-c').value.trim(),
+      option_d: $('#q-opt-d').value.trim(),
+      answer_index: parseInt(document.querySelector('input[name="ans"]:checked').value),
+      explanation: $('#q-explain').value.trim() || null,
+    };
+    if (!payload.question || !payload.option_a) return showToast('題目和選項不可空白', 'error');
+
+    if (isNew) {
+      const { error } = await sb.from('smr_quiz_questions').insert(payload);
+      if (error) return showToast('新增失敗：' + error.message, 'error');
+      showToast(`✓ Day ${day} 已新增`);
+    } else {
+      const { error } = await sb.from('smr_quiz_questions').update(payload).eq('day_number', day);
+      if (error) return showToast('儲存失敗：' + error.message, 'error');
+      showToast(`✓ Day ${day} 已更新`);
+    }
+    await loadQuizGrid();
+  };
+  if (!isNew) {
+    $('#q-delete').onclick = async () => {
+      if (!confirm(`刪除 Day ${day} 題目？`)) return;
+      await sb.from('smr_quiz_questions').delete().eq('day_number', day);
+      showToast(`✓ Day ${day} 已刪除`);
+      await loadQuizGrid();
+    };
   }
+}
+
+function openQuizImport() {
+  $('#ad-quiz-editor').innerHTML = `
+    <div class="card-cyber" style="background:rgba(0,0,0,0.6); border-color:var(--orange);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div class="font-display glow-orange" style="font-size:18px;">📋 批次匯入題庫</div>
+        <button id="ad-import-close" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:20px; cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-bottom:8px;">
+        貼上格式：<br>
+        <code style="background:rgba(0,0,0,0.6); padding:2px 4px; border-radius:4px;">Day 1<br>問題：xxx<br>A. xxx<br>B. xxx<br>C. xxx<br>D. xxx<br>答案：B<br>解析：xxx</code>
+      </div>
+      <textarea id="ad-import-text" class="input-cyber" rows="12" style="resize:vertical; font-family:monospace; font-size:12px;" placeholder="Day 1
+問題：紐崔萊蛋白質粉每份含多少克蛋白質？
+A. 10g
+B. 18g
+C. 25g
+D. 30g
+答案：B
+解析：每份含 18g 優質蛋白質。
+
+Day 2
+..."></textarea>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn-primary" id="ad-import-go" style="flex:1;">解析並匯入</button>
+        <button class="btn-cyber" id="ad-import-replace" style="background:linear-gradient(135deg,#ff3d3d,#ff7c2a);">⚠️ 覆蓋全部</button>
+      </div>
+      <div id="ad-import-preview" style="margin-top:10px; font-size:12px;"></div>
+    </div>
+  `;
+
+  $('#ad-import-close').onclick = () => { $('#ad-quiz-editor').innerHTML = ''; };
+  $('#ad-import-go').onclick = () => importQuestions(false);
+  $('#ad-import-replace').onclick = () => importQuestions(true);
+}
+
+function parseQuizMD(text) {
+  const blocks = text.split(/\n(?=Day\s+\d+)/i);
+  const questions = [];
+  for (const block of blocks) {
+    const dayMatch = block.match(/Day\s+(\d+)/i);
+    const qMatch = block.match(/問題[:：]\s*(.+)/);
+    const aMatch = block.match(/^A[.\s]\s*(.+)/m);
+    const bMatch = block.match(/^B[.\s]\s*(.+)/m);
+    const cMatch = block.match(/^C[.\s]\s*(.+)/m);
+    const dMatch = block.match(/^D[.\s]\s*(.+)/m);
+    const ansMatch = block.match(/答案[:：]\s*([ABCD])/i);
+    const expMatch = block.match(/解析[:：]\s*(.+)/);
+
+    if (dayMatch && qMatch && aMatch && bMatch && cMatch && dMatch && ansMatch) {
+      questions.push({
+        day_number: parseInt(dayMatch[1]),
+        question: qMatch[1].trim(),
+        option_a: aMatch[1].trim(),
+        option_b: bMatch[1].trim(),
+        option_c: cMatch[1].trim(),
+        option_d: dMatch[1].trim(),
+        answer_index: 'ABCD'.indexOf(ansMatch[1].toUpperCase()),
+        explanation: expMatch ? expMatch[1].trim() : null,
+      });
+    }
+  }
+  return questions;
+}
+
+async function importQuestions(replaceAll) {
+  const text = $('#ad-import-text').value;
+  const questions = parseQuizMD(text);
+  if (questions.length === 0) {
+    $('#ad-import-preview').innerHTML = '<div style="color:#ff3d3d;">❌ 解析失敗：無法找到任何題目，請檢查格式</div>';
+    return;
+  }
+  if (!confirm(`成功解析 ${questions.length} 題，${replaceAll ? '覆蓋現有所有題目' : '存在的題目會被更新'}，繼續嗎？`)) return;
+
+  if (replaceAll) {
+    await sb.from('smr_quiz_questions').delete().neq('day_number', -1);
+  }
+
+  // upsert
+  const { error } = await sb.from('smr_quiz_questions').upsert(questions, { onConflict: 'day_number' });
+  if (error) {
+    $('#ad-import-preview').innerHTML = `<div style="color:#ff3d3d;">❌ 寫入失敗：${error.message}</div>`;
+    return;
+  }
+  $('#ad-import-preview').innerHTML = `<div style="color:#4caf50;">✓ 成功匯入 ${questions.length} 題</div>`;
+  showToast(`✓ 匯入 ${questions.length} 題完成`);
+  await loadQuizGrid();
+}
+
+function exportQuizMD() {
+  if (allQuestions.length === 0) return showToast('題庫為空', 'error');
+  const md = allQuestions.sort((a,b) => a.day_number - b.day_number).map(q => {
+    const ans = ['A','B','C','D'][q.answer_index];
+    return `Day ${q.day_number}\n問題：${q.question}\nA. ${q.option_a}\nB. ${q.option_b}\nC. ${q.option_c}\nD. ${q.option_d}\n答案：${ans}${q.explanation ? '\n解析：' + q.explanation : ''}`;
+  }).join('\n\n');
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `smr_quiz_export_${new Date().toISOString().split('T')[0]}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✓ 已匯出 ${allQuestions.length} 題`);
 }
 
 // ============ EVENT LISTENERS ============
