@@ -3,8 +3,17 @@ import { supabase, phoneToEmail, genReferralCode } from './supabase';
 export async function signUp({ phone, password, name, referredBy }) {
   const email = phoneToEmail(phone);
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: undefined, data: { phone } },
+  });
+  if (error) {
+    if (error.message?.toLowerCase().includes('rate limit')) {
+      throw new Error('註冊太頻繁，請稍後 1 分鐘再試');
+    }
+    throw error;
+  }
 
   const userId = data.user.id;
   const referralCode = genReferralCode();
