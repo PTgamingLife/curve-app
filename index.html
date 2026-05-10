@@ -2,8 +2,24 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>超艋無差別減脂大賽</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<meta name="theme-color" content="#ff7c2a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="超艋減脂" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="超艋無差別減脂大賽" />
+<meta property="og:description" content="紐崔萊 × Ready Player One — 28 天減脂挑戰" />
+<meta property="og:type" content="website" />
+
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2149,13 +2165,82 @@ function attachListeners() {
   }
 }
 
+// ============ PWA Install Prompt ============
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // 已登入後 3 秒顯示提示
+  setTimeout(() => {
+    if (!localStorage.getItem('smr_install_dismissed') && state.page !== 'login') showInstallBanner();
+  }, 3000);
+});
+
+function showInstallBanner() {
+  if (document.getElementById('install-banner')) return;
+  const div = document.createElement('div');
+  div.id = 'install-banner';
+  div.style.cssText = `
+    position:fixed; bottom:80px; left:12px; right:12px; max-width:456px; margin:0 auto; z-index:90;
+    background:linear-gradient(135deg, var(--orange), var(--pink));
+    border-radius:16px; padding:14px 16px;
+    box-shadow:0 8px 32px rgba(255,124,42,0.5);
+    display:flex; align-items:center; gap:12px;
+    animation:slide-up 0.4s ease;
+  `;
+  div.innerHTML = `
+    <div style="font-size:32px;">📲</div>
+    <div style="flex:1;">
+      <div style="font-weight:900; font-size:14px;">加到主畫面更好用</div>
+      <div style="font-size:11px; opacity:0.9; margin-top:2px;">像 App 一樣開啟，不會誤關</div>
+    </div>
+    <button id="install-yes" style="background:rgba(255,255,255,0.25); border:none; color:#fff; padding:8px 14px; border-radius:20px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">安裝</button>
+    <button id="install-no" style="background:none; border:none; color:rgba(255,255,255,0.6); cursor:pointer; font-size:18px;">✕</button>
+  `;
+  document.body.appendChild(div);
+  document.getElementById('install-yes').onclick = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+    }
+    div.remove();
+  };
+  document.getElementById('install-no').onclick = () => {
+    localStorage.setItem('smr_install_dismissed', '1');
+    div.remove();
+  };
+}
+
+// iOS 提示（Safari 不支援 beforeinstallprompt）
+function showIOSInstallTip() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.navigator.standalone;
+  if (isIOS && !isStandalone && !localStorage.getItem('smr_ios_dismissed')) {
+    setTimeout(() => {
+      if (state.page === 'login' || document.getElementById('install-banner')) return;
+      const div = document.createElement('div');
+      div.style.cssText = `position:fixed; bottom:80px; left:12px; right:12px; max-width:456px; margin:0 auto; z-index:90;
+        background:linear-gradient(135deg, var(--orange), var(--pink)); border-radius:16px; padding:14px 16px;
+        display:flex; gap:10px; box-shadow:0 8px 32px rgba(255,124,42,0.5);`;
+      div.innerHTML = `<div style="font-size:28px;">📲</div>
+        <div style="flex:1; font-size:12px; line-height:1.5;">
+          <b>加到主畫面：</b>點底部 <span style="font-size:16px;">⎘</span> → 「加入主畫面」
+        </div>
+        <button id="ios-no" style="background:none; border:none; color:#fff; cursor:pointer;">✕</button>`;
+      document.body.appendChild(div);
+      document.getElementById('ios-no').onclick = () => { localStorage.setItem('smr_ios_dismissed', '1'); div.remove(); };
+    }, 5000);
+  }
+}
+
 // ============ INIT ============
 async function init() {
   await loadConfig();
   const savedPhone = localStorage.getItem('smr_phone');
   if (savedPhone) {
     const u = await loginUser(savedPhone);
-    if (u) { state.page = 'home'; render(); return; }
+    if (u) { state.page = 'home'; render(); showIOSInstallTip(); return; }
   }
   state.page = 'login'; render();
 }

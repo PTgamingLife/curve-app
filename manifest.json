@@ -1,0 +1,16 @@
+{
+  "name": "超艋無差別減脂大賽",
+  "short_name": "超艋減脂",
+  "description": "紐崔萊 × Ready Player One 風格減脂大賽",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f1e",
+  "theme_color": "#ff7c2a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "categories": ["health", "fitness", "lifestyle"],
+  "lang": "zh-TW"
+}
