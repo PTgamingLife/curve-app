@@ -638,11 +638,15 @@ async function callGeminiAI(facePhoto, tonguePhoto, bodyData) {
     contents: [{
       parts: [
         { text: prompt },
-        { inline_data: { mime_type: 'image/jpeg', data: cleanBase64(facePhoto) } },
-        { inline_data: { mime_type: 'image/jpeg', data: cleanBase64(tonguePhoto) } },
+        { inlineData: { mimeType: 'image/jpeg', data: cleanBase64(facePhoto) } },
+        { inlineData: { mimeType: 'image/jpeg', data: cleanBase64(tonguePhoto) } },
       ]
     }],
-    generationConfig: { temperature: 0.7, response_mime_type: 'application/json' }
+    generationConfig: {
+      temperature: 0.7,
+      responseMimeType: 'application/json',
+      maxOutputTokens: 4096,
+    }
   };
 
   // 重試機制：最多 8 次，指數退避 (4s, 6s, 10s, 18s, 30s, 45s, 60s)
@@ -674,14 +678,45 @@ async function callGeminiAI(facePhoto, tonguePhoto, bodyData) {
 
       if (!res.ok) {
         const err = await res.text();
-        throw new Error('AI 呼叫失敗：' + err.slice(0, 200));
+        console.error('Gemini error:', err);
+        throw new Error('AI 呼叫失敗 (' + res.status + ')：' + err.slice(0, 300));
       }
 
       const json = await res.json();
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('AI 回傳格式錯誤');
+      console.log('Gemini response:', json);
+
+      // 檢查是否被 safety filter 阻擋
+      if (json.promptFeedback?.blockReason) {
+        throw new Error('內容被安全機制阻擋：' + json.promptFeedback.blockReason);
+      }
+      const candidate = json.candidates?.[0];
+      if (!candidate) throw new Error('AI 無回傳內容（可能配額用盡或 API 異常）');
+      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        console.warn('Finish reason:', candidate.finishReason);
+      }
+
+      const text = candidate.content?.parts?.[0]?.text;
+      if (!text) throw new Error('AI 回傳格式錯誤（無 text 欄位）');
+
       setAIStatus(`<div style="color:#4caf50; text-align:center;">✓ AI 分析完成，整理中...</div>`);
-      return JSON.parse(text);
+
+      // 強化 JSON 解析：嘗試清除 markdown 包裝
+      let cleaned = text.trim();
+      // 去除 ```json ... ``` 或 ``` ... ``` 包裝
+      cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+      // 找出第一個 { 到最後一個 } 之間的內容
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+      }
+
+      try {
+        return JSON.parse(cleaned);
+      } catch (parseErr) {
+        console.error('JSON parse failed. Raw text:', text);
+        throw new Error('AI 回傳 JSON 格式異常，請重試（已記錄至 console）');
+      }
     } catch (e) {
       if (attempt === MAX_ATTEMPTS) throw e;
       // network error → also retry
