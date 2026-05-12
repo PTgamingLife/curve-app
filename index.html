@@ -630,11 +630,11 @@ async function loginUser(phone) {
   await loadTodayQuiz();
   return u;
 }
-async function registerUser(phone, name, password, avatar) {
+async function registerUser(phone, name, password, avatar, birthdate, gender) {
   if (password !== state.config.registration_password) {
     throw new Error('報名密碼錯誤');
   }
-  const { data, error } = await sb.from('smr_users').insert({ phone, name, avatar }).select().single();
+  const { data, error } = await sb.from('smr_users').insert({ phone, name, avatar, birthdate, gender }).select().single();
   if (error) throw error;
   state.user = data;
   localStorage.setItem('smr_phone', phone);
@@ -726,43 +726,108 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
   const key = state.config?.claude_api_key;
   if (!key) throw new Error('Claude API 金鑰未設定，請聯絡管理員');
 
-  const prompt = `你是一位精通中醫面診與舌診的養生顧問，具備長庚紀念醫院舌診研究室的專業知識。
+  const userGender = state.user.gender || 'male';
+  const userBirth = state.user.birthdate || '';
+  const userAge = userBirth ? Math.floor((Date.now() - new Date(userBirth).getTime()) / 31557600000) : 30;
+  const genderTxt = userGender === 'male' ? '男' : '女';
 
-參考標準：
-- 長庚醫院舌診資料庫研究（CCMP96-RD-005）
-- 氣血虛體質看舌淡（PPV 80.24%）
+  // 體組成標準
+  const stdVisceral = userGender === 'male' ? '4-6' : '2-4';
+  const stdFat = userGender === 'male' ? '18-20%' : '20-25%';
+  const stdMuscle = userGender === 'male' ? '32-36kg' : '28-32kg';
+
+  const prompt = `你是一位精通中醫面診/舌診/體組成分析的養生顧問，整合以下知識體系：
+1. 長庚醫院舌診資料庫研究（CCMP96-RD-005）
+2. 黃帝內經五臟五行理論
+3. Adelle Davis 戴維斯《吃的營養科學觀》
+4. 八字命理五行財運分析
+
+【使用者資料】
+- 性別：${genderTxt}
+- 年齡：${userAge} 歲（生日 ${userBirth}）
+- 體重：${bodyData.weight} kg
+- 體脂率：${bodyData.body_fat}%（標準 ${stdFat}）
+- 肌肉量：${bodyData.muscle} kg（標準 ${stdMuscle}）
+- 內臟脂肪：${bodyData.visceral}（標準 ${stdVisceral}）
+
+【體組成判讀邏輯 — 必須先用這個規則決定 bodyComposition.organConcern】
+1. 內臟脂肪過高（${genderTxt}標準上限以上） → 肝臟需注意（脂肪肝、肝功能）
+2. 體脂率過高 + 內臟脂肪也過高 → 心血管需注意（高血脂、動脈硬化）
+3. 內臟脂肪過低 → 腸胃道需注意（吸收不良、消化系統虛弱）
+4. 內臟脂肪正常 + 體脂率過高 → 腎臟需注意（皮下脂肪堆積、水液代謝）
+5. 肌肉量過低 → 肺部需注意（呼吸肌弱、氣虛）
+
+【五行對應臟腑】
+木→肝膽、火→心小腸、土→脾胃、金→肺大腸、水→腎膀胱
+
+【五行財運分析】
+依生辰、體質、面相綜合推算個人五行平衡度，給予 0-100 分財運分數：
+- 五行平衡（無偏枯）= 90-100 分（八方來財）
+- 缺一行但其他三行旺 = 70-89 分（偏財運佳）
+- 五行偏枯但身強 = 50-69 分（需努力）
+- 五行交戰 = 30-49 分（破財警示）
+- 全身虛弱 = 0-29 分（先養身再聚財）
+
+【舌診標準】
+- 氣血虛看舌淡（PPV 80.24%）
 - 氣滯血瘀看苔薄（特異度 93.33%）
 - 陰虛看舌紅（靈敏度 53.33%）
 
-使用者身體數據：
-- 體重：${bodyData.weight} kg
-- 體脂率：${bodyData.body_fat}%
-- 肌肉量：${bodyData.muscle} kg
-- 內臟脂肪：${bodyData.visceral}
-
-請分析附上的面部照片（第一張）與舌診照片（第二張），結合身體數據，輸出純 JSON（無 markdown），格式：
+請依面部照片（第一張）、舌診照片（第二張）、上述資料，輸出純 JSON：
 
 {
+  "bodyComposition": {
+    "weight": ${bodyData.weight},
+    "bodyFat": ${bodyData.body_fat},
+    "bodyFatStatus": "偏低|正常|偏高",
+    "muscle": ${bodyData.muscle},
+    "muscleStatus": "偏低|正常|偏高",
+    "visceral": ${bodyData.visceral},
+    "visceralStatus": "偏低|正常|偏高",
+    "type": "C型代謝|I型均衡|D型強健|低脂高肌|高脂低肌等具體描述",
+    "organConcern": "肝臟|心血管|腸胃道|腎臟|肺部|無特殊風險",
+    "concernReason": "依上述判讀邏輯解釋原因 40-60 字",
+    "summary": "整體評語 50-80 字"
+  },
+  "fiveElements": {
+    "wood": 0-100, "fire": 0-100, "earth": 0-100, "metal": 0-100, "water": 0-100,
+    "dominant": "木|火|土|金|水",
+    "weakest": "木|火|土|金|水",
+    "balance": "平衡|偏旺|偏弱|交戰",
+    "wealthScore": 0-100,
+    "wealthAdvice": "依五行給的旺財建議 40-60 字"
+  },
   "faceZones": [
-    {"zone":"額頭","organ":"...","status":"正常|輕微失調|需注意"},
-    {"zone":"鼻部","organ":"...","status":"..."},
-    {"zone":"左頰","organ":"...","status":"..."},
-    {"zone":"右頰","organ":"...","status":"..."},
-    {"zone":"眼周","organ":"...","status":"..."},
-    {"zone":"下巴","organ":"...","status":"..."}
+    {"zone":"額頭","organ":"心腦","status":"正常|輕微失調|需注意"},
+    {"zone":"鼻部","organ":"脾胃","status":"..."},
+    {"zone":"左頰","organ":"肝膽","status":"..."},
+    {"zone":"右頰","organ":"肺腸","status":"..."},
+    {"zone":"眼周","organ":"肝腎","status":"..."},
+    {"zone":"下巴","organ":"腎及生殖","status":"..."}
   ],
   "tongueAnalysis": [
-    {"item":"舌色","observation":"...","meaning":"中醫意義20-30字"},
+    {"item":"舌色","observation":"觀察","meaning":"20-30字"},
     {"item":"苔色","observation":"...","meaning":"..."},
     {"item":"苔厚薄","observation":"...","meaning":"..."},
     {"item":"舌形","observation":"...","meaning":"..."},
     {"item":"濕潤度","observation":"...","meaning":"..."}
   ],
   "constitution": {"type":"陰虛|陽虛|氣虛|血虛|氣滯|血瘀|痰濕|正常","description":"50-80字","crossVerify":"30-50字"},
+  "organAdvice": {
+    "concernOrgan": "依 bodyComposition.organConcern 給的器官",
+    "tcmTheory": "黃帝內經對該臟腑的論述 30-50字（如：肝主疏泄、藏血）",
+    "nutrition": "戴維斯營養觀對應建議 30-50字",
+    "exercise": "適合的運動類型 20-40字",
+    "research": [
+      "研究1（標題 + 重點 30-50字）",
+      "研究2（標題 + 重點 30-50字）",
+      "研究3（標題 + 重點 30-50字）"
+    ]
+  },
   "nutrients": [
     {"name":"營養素","reason":"20-30字","foods":"10-15字"},
-    {"name":"營養素","reason":"...","foods":"..."},
-    {"name":"營養素","reason":"...","foods":"..."}
+    {"name":"...","reason":"...","foods":"..."},
+    {"name":"...","reason":"...","foods":"..."}
   ],
   "dietAdvice": {
     "eat": [
@@ -1525,7 +1590,124 @@ const pages = {
 function aiReportCard(rep) {
   if (!rep) return '';
   const statusColor = (s) => s === '正常' ? '#4caf50' : s === '輕微失調' ? '#ffd166' : '#ff7c2a';
+  const valColor = (s) => s === '正常' ? '#4caf50' : '#ff7c2a';
+
+  const bc = rep.bodyComposition || {};
+  const fe = rep.fiveElements || {};
+  const oa = rep.organAdvice || {};
+  const organEmoji = { '肝臟':'🍃', '心血管':'❤️', '腸胃道':'🍚', '腎臟':'💧', '肺部':'🫁', '無特殊風險':'✨' };
+
   return `
+  <!-- ① 體組成報告（放在最上方）-->
+  <div class="card-cyber mx-4 mt-2 fade-in" style="border-color:var(--orange);">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:24px;">📊</span>
+      <div class="font-display glow-orange" style="font-size:20px;">體組成完整報告</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:12px;">
+      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px;">
+        <div style="font-size:10px; color:rgba(255,255,255,0.5);">體重</div>
+        <div class="font-display glow-blue" style="font-size:20px;">${bc.weight || '—'} <span style="font-size:11px;">kg</span></div>
+      </div>
+      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.bodyFatStatus)};">
+        <div style="font-size:10px; color:rgba(255,255,255,0.5);">體脂率 ${bc.bodyFatStatus || ''}</div>
+        <div class="font-display" style="font-size:20px; color:${valColor(bc.bodyFatStatus)};">${bc.bodyFat || '—'} <span style="font-size:11px;">%</span></div>
+      </div>
+      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.muscleStatus)};">
+        <div style="font-size:10px; color:rgba(255,255,255,0.5);">肌肉量 ${bc.muscleStatus || ''}</div>
+        <div class="font-display" style="font-size:20px; color:${valColor(bc.muscleStatus)};">${bc.muscle || '—'} <span style="font-size:11px;">kg</span></div>
+      </div>
+      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.visceralStatus)};">
+        <div style="font-size:10px; color:rgba(255,255,255,0.5);">內臟脂肪 ${bc.visceralStatus || ''}</div>
+        <div class="font-display" style="font-size:20px; color:${valColor(bc.visceralStatus)};">Lv ${bc.visceral || '—'}</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; padding:12px; background:rgba(255,124,42,0.12); border-radius:10px; border:1px solid rgba(255,124,42,0.3);">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:24px;">${organEmoji[bc.organConcern] || '⚕️'}</span>
+        <div>
+          <div style="font-size:11px; color:var(--orange); font-weight:700;">⚠️ 重點關注</div>
+          <div class="font-display" style="font-size:18px; color:#fff;">${bc.organConcern || '—'}</div>
+        </div>
+      </div>
+      <div style="font-size:12px; line-height:1.5; margin-top:6px; opacity:0.9;">${bc.concernReason || ''}</div>
+    </div>
+
+    <div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px; font-size:12px; line-height:1.6;">
+      <b style="color:var(--blue);">🏷️ 體型分類：</b>${bc.type || '—'}<br>
+      <span style="opacity:0.85;">${bc.summary || ''}</span>
+    </div>
+  </div>
+
+  <!-- ② 器官養生建議卡 -->
+  ${oa.concernOrgan ? `
+  <div class="card-cyber mx-4 mt-2" style="border-color:#ffd166;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:22px;">${organEmoji[oa.concernOrgan] || '⚕️'}</span>
+      <div class="font-display glow-gold" style="font-size:18px;">${oa.concernOrgan} 養生建議</div>
+    </div>
+
+    <div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+      <div style="font-size:11px; color:#ffd166; font-weight:700; margin-bottom:4px;">📜 黃帝內經</div>
+      <div style="font-size:13px; line-height:1.5;">${oa.tcmTheory || ''}</div>
+    </div>
+
+    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+      <div style="font-size:11px; color:var(--blue); font-weight:700; margin-bottom:4px;">🧪 戴維斯營養觀</div>
+      <div style="font-size:13px; line-height:1.5;">${oa.nutrition || ''}</div>
+    </div>
+
+    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+      <div style="font-size:11px; color:#4caf50; font-weight:700; margin-bottom:4px;">🏃 運動建議</div>
+      <div style="font-size:13px; line-height:1.5;">${oa.exercise || ''}</div>
+    </div>
+
+    ${oa.research?.length ? `
+    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+      <div style="font-size:11px; color:var(--pink); font-weight:700; margin-bottom:4px;">📚 相關研究</div>
+      <ul style="padding-left:18px; font-size:12px; line-height:1.6;">
+        ${oa.research.map(r => `<li>${r}</li>`).join('')}
+      </ul>
+    </div>
+    ` : ''}
+  </div>
+  ` : ''}
+
+  <!-- ③ 五行財運卡 -->
+  ${fe.wealthScore !== undefined ? `
+  <div class="card-cyber mx-4 mt-2" style="border-color:var(--pink); background:linear-gradient(135deg, rgba(255,61,154,0.12), rgba(255,209,102,0.08));">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:24px;">💰</span>
+      <div class="font-display" style="font-size:18px; color:var(--gold); text-shadow:0 0 12px var(--gold);">五行財運分析</div>
+    </div>
+
+    <div style="text-align:center; margin-top:12px;">
+      <div style="font-size:11px; color:var(--gold); margin-bottom:4px;">財運指數</div>
+      <div class="font-display" style="font-size:44px; color:var(--gold); text-shadow:0 0 20px var(--gold); line-height:1;">${fe.wealthScore}<span style="font-size:18px;">/100</span></div>
+      <div style="font-size:12px; opacity:0.8; margin-top:6px;">五行${fe.balance || '—'} · 主${fe.dominant || '—'}行 · 弱${fe.weakest || '—'}行</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin-top:14px;">
+      ${[['木','wood','#4ade80'],['火','fire','#ef4444'],['土','earth','#d4a574'],['金','metal','#facc15'],['水','water','#60a5fa']].map(([n,k,c]) => `
+        <div style="text-align:center;">
+          <div style="font-size:11px; color:${c}; font-weight:700;">${n}</div>
+          <div style="height:50px; display:flex; align-items:flex-end; justify-content:center; padding:2px;">
+            <div style="width:100%; height:${Math.max(5,(fe[k]||0))}%; background:${c}; border-radius:3px; box-shadow:0 0 8px ${c}; transition:height 0.5s;"></div>
+          </div>
+          <div style="font-size:10px; color:rgba(255,255,255,0.7);">${fe[k] || 0}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.4); border-radius:8px; font-size:12px; line-height:1.6;">
+      <b style="color:var(--gold);">💎 旺財建議：</b>${fe.wealthAdvice || ''}
+    </div>
+  </div>
+  ` : ''}
+
+  <!-- ④ AI 完整分析（原本的內容）-->
   <div class="card-cyber mx-4 mt-2 fade-in" style="border-color:var(--orange);">
     <div style="display:flex; align-items:center; gap:8px;">
       <span style="font-size:24px;">🔬</span>
@@ -1781,41 +1963,43 @@ async function renderPhotoWallContent() {
     return;
   }
 
-  el.innerHTML = photos.map(p => {
-    const heart = p.iLiked ? '❤️' : '🤍';
-    const pin = p.iPinned ? '📌' : '📍';
-    const isMine = p.user_id === state.user.id;
-    return `
-    <div class="card-cyber fade-in" style="margin-bottom:12px; padding:0; overflow:hidden; ${p.iPinned ? 'border-color:var(--gold); box-shadow: 0 0 16px rgba(255,209,102,0.3);' : ''}">
-      <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(0,0,0,0.4);">
-        <div style="font-size:28px;">${p.user.avatar}</div>
-        <div style="flex:1;">
-          <div style="font-weight:700; font-size:14px;">${p.user.name} ${isMine ? '<span style="color:var(--orange); font-size:11px;">(你)</span>' : ''}</div>
-          <div style="font-size:11px; color:rgba(255,255,255,0.5);">${new Date(p.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</div>
+  el.innerHTML = `<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+    ${photos.map(p => {
+      const heart = p.iLiked ? '❤️' : '🤍';
+      const isMine = p.user_id === state.user.id;
+      return `
+      <div class="card-cyber fade-in" style="padding:0; overflow:hidden; ${p.iPinned ? 'border-color:var(--gold); box-shadow: 0 0 12px rgba(255,209,102,0.4);' : ''}">
+        <div style="display:flex; align-items:center; gap:5px; padding:5px 7px; background:rgba(0,0,0,0.5);">
+          <div style="font-size:18px;">${p.user.avatar}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:700; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.user.name}${isMine?' (你)':''}</div>
+            <div style="font-size:9px; color:rgba(255,255,255,0.5);">${new Date(p.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          ${p.iPinned ? '<span style="color:var(--gold); font-size:10px;">📌</span>' : ''}
         </div>
-        ${p.iPinned ? '<span style="color:var(--gold); font-size:11px;">📌 已置頂</span>' : ''}
-      </div>
-      <img src="${p.photo_url}" style="width:100%; max-height:380px; object-fit:cover; display:block;" />
-      <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(0,0,0,0.3);">
-        <button data-like="${p.id}" data-liked="${p.iLiked}" style="
-          background:none; border:none; cursor:${isMine ? 'default' : 'pointer'};
-          font-size:24px; display:flex; align-items:center; gap:6px;
-          color:#fff; font-family:inherit; opacity:${isMine ? 0.5 : 1};
-          transition: transform 0.15s;
-        " ${isMine ? 'disabled' : ''}>
-          <span>${heart}</span>
-          <span style="font-size:14px; font-weight:700;">${p.likeCount}</span>
-        </button>
-        ${!isMine ? `
-        <button data-pin="${p.id}" data-pinned="${p.iPinned}" style="
-          background:none; border:none; cursor:pointer;
-          font-size:20px; color:#fff; font-family:inherit;
-          margin-left:auto; opacity:${p.iPinned ? 1 : 0.5};
-        ">${pin}</button>
-        ` : '<span style="margin-left:auto; font-size:11px; color:rgba(255,255,255,0.4);">這是你的照片</span>'}
-      </div>
-    </div>`;
-  }).join('');
+        <div style="position:relative;">
+          <img src="${p.photo_url}" style="width:100%; aspect-ratio:1; object-fit:cover; display:block;" />
+        </div>
+        <div style="display:flex; align-items:center; gap:4px; padding:5px 7px; background:rgba(0,0,0,0.4);">
+          <button data-like="${p.id}" data-liked="${p.iLiked}" style="
+            background:none; border:none; cursor:${isMine ? 'default' : 'pointer'};
+            font-size:16px; display:flex; align-items:center; gap:3px;
+            color:#fff; font-family:inherit; opacity:${isMine ? 0.5 : 1};
+            transition: transform 0.15s; padding:2px;
+          " ${isMine ? 'disabled' : ''}>
+            <span>${heart}</span><span style="font-size:11px; font-weight:700;">${p.likeCount}</span>
+          </button>
+          ${!isMine ? `
+          <button data-pin="${p.id}" data-pinned="${p.iPinned}" style="
+            background:none; border:none; cursor:pointer;
+            font-size:13px; color:#fff; font-family:inherit;
+            margin-left:auto; opacity:${p.iPinned ? 1 : 0.4}; padding:2px;
+          ">📌</button>
+          ` : ''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
 
   // 綁定愛心
   el.querySelectorAll('[data-like]').forEach(btn => {
@@ -1952,6 +2136,23 @@ function renderLogin() {
             <label style="font-size:13px; color:var(--blue); font-weight:700;">👤 姓名</label>
             <input id="reg-name" class="input-cyber mt-1" placeholder="你的名字" />
           </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">🎂 生日</label>
+              <input id="reg-birthdate" type="date" class="input-cyber mt-1" />
+            </div>
+            <div>
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">⚧ 性別</label>
+              <select id="reg-gender" class="input-cyber mt-1">
+                <option value="">請選擇</option>
+                <option value="male">男</option>
+                <option value="female">女</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:-4px; line-height:1.4;">
+            ⚠️ 用於八字五行財運分析與體組成標準判讀（不會公開）
+          </div>
           <div>
             <label style="font-size:13px; color:var(--orange); font-weight:700;">🔐 報名密碼</label>
             <input id="reg-pwd" class="input-cyber mt-1" type="password" placeholder="請洽主辦單位" />
@@ -1979,10 +2180,14 @@ function renderLogin() {
     $('#reg-submit').onclick = async () => {
       const name = $('#reg-name').value.trim();
       const pwd = $('#reg-pwd').value;
+      const birthdate = $('#reg-birthdate').value;
+      const gender = $('#reg-gender').value;
       if (!name) return showToast('請輸入姓名', 'error');
       if (!pwd) return showToast('請輸入密碼', 'error');
+      if (!birthdate) return showToast('請選擇生日', 'error');
+      if (!gender) return showToast('請選擇性別', 'error');
       try {
-        await registerUser(state.registerData.phone, name, pwd, avatar);
+        await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender);
         showToast('🎉 歡迎加入！');
         state.page = 'home'; render();
       } catch (e) {
