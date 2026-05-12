@@ -819,9 +819,9 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
     "nutrition": "戴維斯營養觀對應建議 30-50字",
     "exercise": "適合的運動類型 20-40字",
     "research": [
-      "研究1（標題 + 重點 30-50字）",
-      "研究2（標題 + 重點 30-50字）",
-      "研究3（標題 + 重點 30-50字）"
+      "純字串：研究標題 - 重點摘要 30-50字",
+      "純字串：研究標題 - 重點摘要 30-50字",
+      "純字串：研究標題 - 重點摘要 30-50字"
     ]
   },
   "nutrients": [
@@ -835,7 +835,7 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
       {"food":"...","reason":"..."},
       {"food":"...","reason":"..."}
     ],
-    "avoid": {"food":"...","reason":"15-25字"}
+    "avoid": {"food":"單一食材名稱字串","reason":"15-25字原因字串"}
   },
   "acupoints": [
     {"name":"穴位","location":"取穴位置","effect":"功效"},
@@ -1692,7 +1692,13 @@ function aiReportCard(rep) {
     <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
       <div style="font-size:11px; color:var(--pink); font-weight:700; margin-bottom:4px;">📚 相關研究</div>
       <ul style="padding-left:18px; font-size:12px; line-height:1.6;">
-        ${oa.research.map(r => `<li>${r}</li>`).join('')}
+        ${oa.research.map(r => {
+          if (typeof r === 'string') return `<li>${r}</li>`;
+          // 物件格式：可能是 {title, point} 或 {title, summary} 或其他
+          const title = r.title || r.name || '';
+          const content = r.point || r.summary || r.content || r.description || r.text || '';
+          return `<li>${title ? `<b>${title}</b>` : ''}${title && content ? '：' : ''}${content}</li>`;
+        }).join('')}
       </ul>
     </div>
     ` : ''}
@@ -1796,12 +1802,25 @@ function aiReportCard(rep) {
         <b>${e.food}</b> · <span style="opacity:0.8;">${e.reason}</span>
       </div>
     `).join('')}
-    ${rep.dietAdvice?.avoid ? `
-      <div style="font-size:12px; color:#ff3d3d; font-weight:700; margin-top:8px; margin-bottom:4px;">⚠️ 應減少</div>
-      <div style="font-size:13px; padding:5px 8px; background:rgba(255,61,61,0.1); border-radius:6px;">
-        <b>${rep.dietAdvice.avoid.food}</b> · <span style="opacity:0.8;">${rep.dietAdvice.avoid.reason}</span>
-      </div>
-    ` : ''}
+    ${(() => {
+      const av = rep.dietAdvice?.avoid;
+      if (!av) return '';
+      const items = Array.isArray(av) ? av : [av];
+      const valid = items.filter(x => x && typeof x === 'object' && (x.food || x.name || x.item));
+      if (!valid.length) {
+        // 可能是字串陣列或單一字串
+        const strs = Array.isArray(av) ? av.filter(x => typeof x === 'string') : (typeof av === 'string' ? [av] : []);
+        if (!strs.length) return '';
+        return `<div style="font-size:12px; color:#ff3d3d; font-weight:700; margin-top:8px; margin-bottom:4px;">⚠️ 應減少</div>` +
+          strs.map(s => `<div style="font-size:13px; padding:5px 8px; background:rgba(255,61,61,0.1); border-radius:6px; margin-bottom:4px;">${s}</div>`).join('');
+      }
+      return `<div style="font-size:12px; color:#ff3d3d; font-weight:700; margin-top:8px; margin-bottom:4px;">⚠️ 應減少</div>` +
+        valid.map(x => `
+          <div style="font-size:13px; padding:5px 8px; background:rgba(255,61,61,0.1); border-radius:6px; margin-bottom:4px;">
+            <b>${x.food || x.name || x.item}</b>${x.reason || x.description ? ` · <span style="opacity:0.8;">${x.reason || x.description}</span>` : ''}
+          </div>
+        `).join('');
+    })()}
   </div>
 
   <div class="card-cyber mx-4 mt-2">
