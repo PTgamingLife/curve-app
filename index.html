@@ -229,32 +229,35 @@ body::before {
 .quiz-opt.correct { background: rgba(76,175,80,0.2); border-color: #4caf50; }
 .quiz-opt.wrong { background: rgba(255,61,61,0.2); border-color: #ff3d3d; }
 
-/* Badge cell */
+/* Badge cell — 圓形 */
 .badge-cell {
   aspect-ratio: 1;
-  background: rgba(0,0,0,0.5);
-  border: 2px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
+  background: radial-gradient(circle, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.85) 100%);
+  border: 2px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; padding: 4px;
+  gap: 1px; padding: 4px;
   position: relative;
   transition: all 0.2s;
+  cursor: pointer;
 }
 .badge-cell.earned {
-  background: linear-gradient(135deg, rgba(255,124,42,0.2), rgba(255,209,102,0.2));
+  background: radial-gradient(circle, rgba(255,209,102,0.25) 0%, rgba(255,124,42,0.15) 100%);
   border-color: var(--gold);
-  box-shadow: 0 0 12px rgba(255,209,102,0.4);
+  box-shadow: 0 0 14px rgba(255,209,102,0.5), inset 0 0 8px rgba(255,209,102,0.2);
 }
 .badge-cell.today {
   animation: pulse-glow 1.2s infinite;
   border-color: var(--orange);
 }
 .badge-cell .day-num {
-  position: absolute; top: 2px; left: 4px;
-  font-size: 10px; font-weight: 900;
-  opacity: 0.6;
+  position: absolute; top: 4px;
+  font-size: 9px; font-weight: 900;
+  opacity: 0.55;
   font-family: 'Bangers';
+  color: var(--gold);
 }
+.badge-cell:active { transform: scale(0.92); }
 
 /* Progress bar */
 .bar-track {
@@ -425,6 +428,49 @@ async function fileToCompressedBase64(file, maxSize = 800, quality = 0.7) {
   URL.revokeObjectURL(img.src);
   return canvas.toDataURL('image/jpeg', quality);
 }
+
+// 壓縮成 Blob（不轉 base64，給 Storage 用）
+async function fileToCompressedBlob(file, maxSize = 800, quality = 0.7) {
+  const img = await new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = rej;
+    im.src = URL.createObjectURL(file);
+  });
+  const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+  URL.revokeObjectURL(img.src);
+  return new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+}
+
+// 上傳到 Storage 並回傳 public URL
+async function uploadToStorage(blob, filename) {
+  const { error } = await sb.storage.from('smr-photos').upload(filename, blob, {
+    contentType: 'image/jpeg',
+    upsert: true,
+  });
+  if (error) throw new Error('上傳失敗：' + error.message);
+  const { data: pub } = sb.storage.from('smr-photos').getPublicUrl(filename);
+  return pub.publicUrl;
+}
+
+// 同時生成主圖 + 縮圖，上傳兩個檔，回傳 {photoUrl, thumbUrl}
+async function uploadPhotoWithThumb(file, userId) {
+  const [mainBlob, thumbBlob] = await Promise.all([
+    fileToCompressedBlob(file, 800, 0.78),
+    fileToCompressedBlob(file, 200, 0.7),
+  ]);
+  const ts = Date.now();
+  const [photoUrl, thumbUrl] = await Promise.all([
+    uploadToStorage(mainBlob, `lunch/${userId}/${ts}.jpg`),
+    uploadToStorage(thumbBlob, `lunch/${userId}/${ts}_thumb.jpg`),
+  ]);
+  return { photoUrl, thumbUrl };
+}
 function showToast(msg, type = 'success') {
   const div = document.createElement('div');
   div.className = `toast ${type}`;
@@ -470,15 +516,19 @@ async function loadUserData() {
   checkBadgeEligibility();
 }
 
-async function loadPhotoWall() {
-  // 撈今天所有有照片的打卡 + 對應使用者 + 愛心數
+// 緩存今日所有照片 + 排序好的清單
+let _photoWallCache = null;
+
+async function loadPhotoWall(forceRefresh = false) {
+  if (_photoWallCache && !forceRefresh) return _photoWallCache;
+
   const day = today();
   const { data: checkins } = await sb.from('smr_meal_checkins')
-    .select('*')
+    .select('id, user_id, checkin_date, photo_url, thumb_url, created_at')
     .eq('checkin_date', day)
     .not('photo_url', 'is', null);
 
-  if (!checkins?.length) return [];
+  if (!checkins?.length) { _photoWallCache = []; return []; }
 
   const userIds = [...new Set(checkins.map(c => c.user_id))];
   const checkinIds = checkins.map(c => c.id);
@@ -495,17 +545,14 @@ async function loadPhotoWall() {
     likesByCheckin[l.checkin_id].push(l);
   }
 
-  // 整理回傳：含使用者資訊、愛心數、我有沒有按愛心、有沒有置頂
   const enriched = checkins.map(c => ({
     ...c,
     user: userMap[c.user_id] || { name: '匿名', avatar: '👤' },
-    likes: likesByCheckin[c.id] || [],
     likeCount: (likesByCheckin[c.id] || []).length,
     iLiked: (likesByCheckin[c.id] || []).some(l => l.liker_id === state.user.id),
     iPinned: (likesByCheckin[c.id] || []).some(l => l.liker_id === state.user.id && l.is_pinned),
   }));
 
-  // 排序：我置頂的優先 → 我按過愛心的 → 愛心多的 → 時間新的
   enriched.sort((a, b) => {
     if (a.iPinned !== b.iPinned) return b.iPinned - a.iPinned;
     if (a.iLiked !== b.iLiked) return b.iLiked - a.iLiked;
@@ -513,6 +560,7 @@ async function loadPhotoWall() {
     return b.created_at.localeCompare(a.created_at);
   });
 
+  _photoWallCache = enriched;
   return enriched;
 }
 
@@ -658,16 +706,17 @@ async function submitQuiz(answerIdx) {
   render();
 }
 
-async function checkIn(meal, photoBase64) {
+async function checkIn(meal, photoUrl, thumbUrl) {
   const has = state.mealCheckins.find(c => c.checkin_date === today() && c.meal_type === meal);
   if (has) return showToast('已打過卡', 'error');
-  if (!photoBase64) return showToast('請上傳餐點照片', 'error');
+  if (!photoUrl) return showToast('請上傳餐點照片', 'error');
   const { data, error } = await sb.from('smr_meal_checkins').insert({
-    user_id: state.user.id, meal_type: meal, checkin_date: today(), photo_url: photoBase64
+    user_id: state.user.id, meal_type: meal, checkin_date: today(),
+    photo_url: photoUrl, thumb_url: thumbUrl || photoUrl
   }).select().single();
   if (error) return showToast('打卡失敗', 'error');
   state.mealCheckins.push(data);
-  sfx.checkin(); showToast(`✓ 運動或健康餐打卡成功`);
+  sfx.checkin(); showToast(`✓ 打卡成功`);
   await addXP(10);
   checkBadgeEligibility();
   render();
@@ -845,6 +894,10 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
   "lifestyle": ["建議1","建議2","建議3"],
   "westernNotes": ["西醫提示1","提示2","提示3"]
 }
+
+⚠️ 重要規範：
+1. 蛋白粉相關建議：絕對不要把「蛋白粉」放在 dietAdvice.avoid（應減少）類別。蛋白粉是好東西，正確說法是「選擇 PDCAAS=1 的高品質完全蛋白（如紐崔萊蛋白素，含大豆+乳清+豌豆三源），可提高吸收率，避免脾胃負擔」。若體質為脾虛/痰濕，請在 dietAdvice.eat 推薦 PDCAAS=1 蛋白粉並說明挑選重點，而非禁止。
+2. dietAdvice.avoid 只放真正應該避免的：油膩肥肉、冷飲冰水、過甜零食、辛辣刺激等。
 
 繁體中文，養生參考非醫療診斷。`;
 
@@ -1427,16 +1480,54 @@ const pages = {
   body: () => {
     const todayRec = state.bodyRecords.find(r => r.recorded_date === today());
     const aiUsed = state.user.ai_used;
+    const aiReport = state.user.ai_report;
 
-    // === 已用過 AI + 今日已記錄 → 顯示 AI 報告或基本報告 ===
-    if (todayRec && aiUsed) {
+    // === 已用過 AI 且今天已記錄 → AI 報告 + 今日基本報告 ===
+    if (todayRec && aiUsed && aiReport) {
       return `
       <div style="padding:20px 16px;">
         <h1 class="font-display glow-orange" style="font-size:28px;">BODY DATA</h1>
         <div class="font-handwrite glow-blue" style="font-size:18px;">今日已記錄 ✓ · 查看 AI 完整報告</div>
       </div>
-      ${aiReportCard(state.user.ai_report)}
+      ${aiReportCard(aiReport)}
       ${reportCard(todayRec, state.bodyRecords[state.bodyRecords.indexOf(todayRec) - 1])}
+      `;
+    }
+
+    // === 已用過 AI 但今天還沒記錄 → 顯示之前 AI 報告 + 輸入今日數據 ===
+    if (!todayRec && aiUsed && aiReport) {
+      return `
+      <div style="padding:20px 16px;">
+        <h1 class="font-display glow-orange" style="font-size:28px;">BODY DATA</h1>
+        <div class="font-handwrite glow-blue" style="font-size:18px;">📋 之前的 AI 報告 + 輸入今日數據</div>
+      </div>
+      ${aiReportCard(aiReport)}
+      <div style="padding:0 16px; margin-top:12px;">
+        <div class="font-display glow-blue" style="font-size:18px; text-align:center; margin-bottom:8px;">📊 輸入今日身體數據</div>
+      </div>
+      <div class="px-4">
+        <div class="card-cyber">
+          <form id="body-form" style="display:flex; flex-direction:column; gap:14px;">
+            <div>
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">⚖️ 體重 (kg)</label>
+              <input class="input-cyber mt-1" name="weight" type="number" step="0.1" placeholder="例：65.5" required />
+            </div>
+            <div>
+              <label style="font-size:13px; color:var(--orange); font-weight:700;">🔥 體脂肪 (%)</label>
+              <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：22.5" required />
+            </div>
+            <div>
+              <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (kg)</label>
+              <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.0" required />
+            </div>
+            <div>
+              <label style="font-size:13px; color:#ffd166; font-weight:700;">🍔 內臟脂肪 (1-20)</label>
+              <input class="input-cyber mt-1" name="visceral" type="number" min="1" max="20" placeholder="例：6" required />
+            </div>
+            <button type="submit" class="btn-primary">送出今日數據</button>
+          </form>
+        </div>
+      </div>
       `;
     }
 
@@ -1555,15 +1646,18 @@ const pages = {
     <div class="px-4 mt-2">
       <div class="bar-track" style="height:14px;"><div class="bar-fill" style="width:${(state.badges.length/28)*100}%; background:linear-gradient(90deg,var(--gold),var(--orange));"></div></div>
     </div>
-    <div class="grid grid-cols-4 gap-2 px-4 mt-4">
+    <div class="grid grid-cols-4 gap-3 px-4 mt-4">
       ${BADGE_NAMES.map(([name, emoji], i) => {
         const dayNum = i + 1;
         const earned = state.badges.find(b => b.day_number === dayNum);
         const isToday = dayNum === day && !earned;
-        return `<div class="badge-cell ${earned?'earned':''} ${isToday?'today':''}">
+        const isFuture = dayNum > day;
+        const status = earned ? 'earned' : isToday ? 'today' : isFuture ? 'future' : 'missed';
+        return `<div class="badge-cell ${earned?'earned':''} ${isToday?'today':''}"
+          data-badge-day="${dayNum}" data-badge-status="${status}" data-badge-name="${name}">
           <div class="day-num">${dayNum}</div>
-          <div style="font-size:24px; ${earned?'':'filter:grayscale(1); opacity:0.4;'}">${emoji}</div>
-          <div style="font-size:9px; text-align:center; line-height:1.1; ${earned?'color:var(--gold)':'color:rgba(255,255,255,0.4)'}">${name}</div>
+          <div style="font-size:22px; margin-top:6px; ${earned?'':'filter:grayscale(1); opacity:0.35;'}">${emoji}</div>
+          <div style="font-size:8px; text-align:center; line-height:1.1; ${earned?'color:var(--gold)':'color:rgba(255,255,255,0.4)'}">${name}</div>
         </div>`;
       }).join('')}
     </div>
@@ -1992,11 +2086,60 @@ function renderReportList() {
   }).join('');
 }
 
+const PHOTOS_PER_PAGE = 12;
+let _photoWallPage = 1;
+let _photoWallLoading = false;
+
+function photoCardHTML(p) {
+  const heart = p.iLiked ? '❤️' : '🤍';
+  const isMine = p.user_id === state.user.id;
+  const imgSrc = p.thumb_url || p.photo_url;
+  // 若是 base64 (舊資料) 直接顯示，否則 lazy load
+  const isUrl = imgSrc && imgSrc.startsWith('http');
+  return `
+    <div class="photo-card fade-in" data-photo-id="${p.id}" data-full="${p.photo_url}" style="
+      background:rgba(15,15,30,0.9); border-radius:12px; overflow:hidden;
+      border:2px solid ${p.iPinned ? 'var(--gold)' : 'rgba(0,180,216,0.3)'};
+      ${p.iPinned ? 'box-shadow: 0 0 12px rgba(255,209,102,0.4);' : ''}
+    ">
+      <div style="display:flex; align-items:center; gap:5px; padding:5px 7px; background:rgba(0,0,0,0.5);">
+        <div style="font-size:16px;">${p.user.avatar}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.user.name}${isMine?' (你)':''}</div>
+          <div style="font-size:9px; color:rgba(255,255,255,0.5);">${new Date(p.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        ${p.iPinned ? '<span style="color:var(--gold); font-size:10px;">📌</span>' : ''}
+      </div>
+      <div class="photo-thumb-wrap" style="position:relative; cursor:pointer; background:rgba(0,0,0,0.3);">
+        <img ${isUrl ? `loading="lazy"` : ''} src="${imgSrc}" style="width:100%; aspect-ratio:1; object-fit:cover; display:block;" />
+      </div>
+      <div style="display:flex; align-items:center; gap:4px; padding:5px 7px; background:rgba(0,0,0,0.4);">
+        <button data-like="${p.id}" data-liked="${p.iLiked}" style="
+          background:none; border:none; cursor:${isMine ? 'default' : 'pointer'};
+          font-size:16px; display:flex; align-items:center; gap:3px;
+          color:#fff; font-family:inherit; opacity:${isMine ? 0.5 : 1};
+          transition: transform 0.15s; padding:2px;
+        " ${isMine ? 'disabled' : ''}>
+          <span>${heart}</span><span style="font-size:11px; font-weight:700;">${p.likeCount}</span>
+        </button>
+        ${!isMine ? `
+        <button data-pin="${p.id}" data-pinned="${p.iPinned}" style="
+          background:none; border:none; cursor:pointer;
+          font-size:13px; color:#fff; font-family:inherit;
+          margin-left:auto; opacity:${p.iPinned ? 1 : 0.4}; padding:2px;
+        ">📌</button>
+        ` : ''}
+      </div>
+    </div>`;
+}
+
 async function renderPhotoWallContent() {
   const el = document.getElementById('photowall-content');
   if (!el) return;
 
-  const photos = await loadPhotoWall();
+  _photoWallPage = 1;
+  const photos = await loadPhotoWall(true);
+
   if (!photos.length) {
     el.innerHTML = `<div class="card-cyber" style="text-align:center; padding:40px; color:rgba(255,255,255,0.6);">
       <div style="font-size:48px;">📷</div>
@@ -2006,63 +2149,140 @@ async function renderPhotoWallContent() {
     return;
   }
 
-  el.innerHTML = `<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
-    ${photos.map(p => {
-      const heart = p.iLiked ? '❤️' : '🤍';
-      const isMine = p.user_id === state.user.id;
-      return `
-      <div class="card-cyber fade-in" style="padding:0; overflow:hidden; ${p.iPinned ? 'border-color:var(--gold); box-shadow: 0 0 12px rgba(255,209,102,0.4);' : ''}">
-        <div style="display:flex; align-items:center; gap:5px; padding:5px 7px; background:rgba(0,0,0,0.5);">
-          <div style="font-size:18px;">${p.user.avatar}</div>
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:700; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.user.name}${isMine?' (你)':''}</div>
-            <div style="font-size:9px; color:rgba(255,255,255,0.5);">${new Date(p.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</div>
-          </div>
-          ${p.iPinned ? '<span style="color:var(--gold); font-size:10px;">📌</span>' : ''}
-        </div>
-        <div style="position:relative;">
-          <img src="${p.photo_url}" style="width:100%; aspect-ratio:1; object-fit:cover; display:block;" />
-        </div>
-        <div style="display:flex; align-items:center; gap:4px; padding:5px 7px; background:rgba(0,0,0,0.4);">
-          <button data-like="${p.id}" data-liked="${p.iLiked}" style="
-            background:none; border:none; cursor:${isMine ? 'default' : 'pointer'};
-            font-size:16px; display:flex; align-items:center; gap:3px;
-            color:#fff; font-family:inherit; opacity:${isMine ? 0.5 : 1};
-            transition: transform 0.15s; padding:2px;
-          " ${isMine ? 'disabled' : ''}>
-            <span>${heart}</span><span style="font-size:11px; font-weight:700;">${p.likeCount}</span>
-          </button>
-          ${!isMine ? `
-          <button data-pin="${p.id}" data-pinned="${p.iPinned}" style="
-            background:none; border:none; cursor:pointer;
-            font-size:13px; color:#fff; font-family:inherit;
-            margin-left:auto; opacity:${p.iPinned ? 1 : 0.4}; padding:2px;
-          ">📌</button>
-          ` : ''}
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
+  // 第一頁
+  const firstBatch = photos.slice(0, PHOTOS_PER_PAGE);
+  el.innerHTML = `
+    <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:8px;">
+      📷 共 ${photos.length} 張照片 · 滑到底自動載入更多
+    </div>
+    <div id="photo-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+      ${firstBatch.map(p => photoCardHTML(p)).join('')}
+    </div>
+    <div id="photo-loadmore" style="text-align:center; padding:20px; color:rgba(255,255,255,0.4); font-size:12px;">
+      ${photos.length > PHOTOS_PER_PAGE ? '⏬ 下滑載入更多' : '— 已顯示全部 —'}
+    </div>
+  `;
 
-  // 綁定愛心
-  el.querySelectorAll('[data-like]').forEach(btn => {
-    btn.onclick = async () => {
+  bindPhotoCardListeners();
+  setupPhotoInfiniteScroll();
+}
+
+function bindPhotoCardListeners() {
+  // 點縮圖看大圖
+  document.querySelectorAll('.photo-thumb-wrap').forEach(el => {
+    el.onclick = () => {
+      const card = el.closest('[data-full]');
+      openPhotoLightbox(card.dataset.full);
+    };
+  });
+  // 愛心
+  document.querySelectorAll('[data-like]').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
       const liked = btn.dataset.liked === 'true';
       btn.style.transform = 'scale(1.3)';
       setTimeout(() => btn.style.transform = 'scale(1)', 200);
       await toggleLike(btn.dataset.like, liked);
-      renderPhotoWallContent();
+      // 局部更新該卡片
+      _photoWallCache = null;
+      const photos = await loadPhotoWall();
+      const updated = photos.find(p => p.id === btn.dataset.like);
+      if (updated) {
+        const card = btn.closest('[data-photo-id]');
+        if (card) card.outerHTML = photoCardHTML(updated);
+        bindPhotoCardListeners();
+      }
     };
   });
-  // 綁定置頂
-  el.querySelectorAll('[data-pin]').forEach(btn => {
-    btn.onclick = async () => {
+  // 置頂
+  document.querySelectorAll('[data-pin]').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
       const pinned = btn.dataset.pinned === 'true';
       await togglePin(btn.dataset.pin, pinned);
       showToast(pinned ? '已取消置頂' : '✓ 已置頂該用戶', 'success');
+      // 置頂後需要重新排序，全部重畫
       renderPhotoWallContent();
     };
   });
+}
+
+function setupPhotoInfiniteScroll() {
+  const sentinel = document.getElementById('photo-loadmore');
+  if (!sentinel) return;
+  const obs = new IntersectionObserver(async (entries) => {
+    if (!entries[0].isIntersecting || _photoWallLoading) return;
+    const photos = await loadPhotoWall();
+    const totalShown = _photoWallPage * PHOTOS_PER_PAGE;
+    if (totalShown >= photos.length) {
+      sentinel.textContent = '— 已顯示全部 —';
+      obs.disconnect();
+      return;
+    }
+    _photoWallLoading = true;
+    _photoWallPage++;
+    const nextBatch = photos.slice(totalShown, totalShown + PHOTOS_PER_PAGE);
+    const grid = document.getElementById('photo-grid');
+    if (grid) grid.insertAdjacentHTML('beforeend', nextBatch.map(p => photoCardHTML(p)).join(''));
+    bindPhotoCardListeners();
+    _photoWallLoading = false;
+    if (_photoWallPage * PHOTOS_PER_PAGE >= photos.length) {
+      sentinel.textContent = '— 已顯示全部 —';
+      obs.disconnect();
+    }
+  }, { rootMargin: '200px' });
+  obs.observe(sentinel);
+}
+
+function showBadgePopup(emoji, title, msg, color) {
+  // 移除前一個
+  document.getElementById('badge-popup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'badge-popup';
+  popup.style.cssText = `
+    position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center;
+    padding:30px; cursor:pointer;
+    animation: fadeIn 0.2s ease;
+  `;
+  popup.innerHTML = `
+    <div style="
+      background: linear-gradient(135deg, rgba(26,26,46,0.98), rgba(15,15,30,0.98));
+      border: 2px solid ${color};
+      border-radius: 20px; padding: 28px 24px;
+      max-width: 320px; text-align: center;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px ${color};
+      animation: slide-up 0.3s ease;
+    ">
+      <div style="font-size:56px; margin-bottom:8px;">${emoji}</div>
+      <div class="font-display" style="font-size:20px; color:${color}; text-shadow:0 0 12px ${color}; margin-bottom:10px;">${title}</div>
+      <div style="font-size:14px; color:#fff; line-height:1.7; white-space:pre-line;">${msg}</div>
+      <button style="
+        margin-top:18px; background:transparent; border:1.5px solid ${color};
+        color:${color}; padding:8px 24px; border-radius:20px; cursor:pointer;
+        font-family:inherit; font-weight:700;
+      ">關閉</button>
+    </div>
+  `;
+  popup.onclick = () => popup.remove();
+  document.body.appendChild(popup);
+}
+
+function openPhotoLightbox(url) {
+  const lb = document.createElement('div');
+  lb.style.cssText = `
+    position:fixed; inset:0; z-index:999;
+    background:rgba(0,0,0,0.92); backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; cursor:pointer;
+  `;
+  lb.innerHTML = `
+    <img src="${url}" style="max-width:100%; max-height:90vh; object-fit:contain; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.5);" />
+    <div style="position:absolute; top:20px; right:20px; color:#fff; font-size:32px; line-height:1; cursor:pointer;">✕</div>
+  `;
+  lb.onclick = () => lb.remove();
+  document.body.appendChild(lb);
 }
 
 async function renderRankContent() {
@@ -2179,19 +2399,17 @@ function renderLogin() {
             <label style="font-size:13px; color:var(--blue); font-weight:700;">👤 姓名</label>
             <input id="reg-name" class="input-cyber mt-1" placeholder="你的名字" />
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div>
-              <label style="font-size:13px; color:var(--blue); font-weight:700;">🎂 生日</label>
-              <input id="reg-birthdate" type="date" class="input-cyber mt-1" />
-            </div>
-            <div>
-              <label style="font-size:13px; color:var(--blue); font-weight:700;">⚧ 性別</label>
-              <select id="reg-gender" class="input-cyber mt-1">
-                <option value="">請選擇</option>
-                <option value="male">男</option>
-                <option value="female">女</option>
-              </select>
-            </div>
+          <div>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">🎂 生日</label>
+            <input id="reg-birthdate" type="date" class="input-cyber mt-1" style="width:100%;" />
+          </div>
+          <div>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">⚧ 性別</label>
+            <select id="reg-gender" class="input-cyber mt-1" style="width:100%; appearance:auto;">
+              <option value="">請選擇</option>
+              <option value="male">男</option>
+              <option value="female">女</option>
+            </select>
           </div>
           <div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:-4px; line-height:1.4;">
             ⚠️ 用於八字五行財運分析與體組成標準判讀（不會公開）
@@ -2629,22 +2847,72 @@ function attachListeners() {
   if (state.page === 'photowall') renderPhotoWallContent();
   if (state.page === 'home') updateHomeHearts();
 
-  // Lunch photo upload
+  // 勳章點擊
+  if (state.page === 'badges') {
+    $$('[data-badge-day]').forEach(el => {
+      el.onclick = () => {
+        const day = parseInt(el.dataset.badgeDay);
+        const name = el.dataset.badgeName;
+        const status = el.dataset.badgeStatus;
+        const todayDay = gameDay();
+
+        if (status === 'earned') {
+          showBadgePopup('🏆', `Day ${day} · ${name}`, '✓ 已獲得', '#ffd166');
+          return;
+        }
+        if (status === 'future') {
+          showBadgePopup('🔒', `Day ${day} · ${name}`, '尚未到達該日期', 'rgba(255,255,255,0.5)');
+          return;
+        }
+        if (status === 'today') {
+          // 今日未完成 — 詳細列出未完成項目
+          const lunchDone = state.mealCheckins.find(c => c.checkin_date === today() && c.meal_type === 'lunch');
+          const quizDone = state.quizRecords.find(q => q.quiz_day === todayDay);
+          const missing = [];
+          if (!quizDone) missing.push('📝 今日測驗');
+          if (!lunchDone) missing.push('☀️ 運動或健康餐打卡');
+          if (!missing.length) {
+            // 兩項都完成但還沒領取
+            showBadgePopup('🎁', `Day ${day} · ${name}`, '可以領取了！前往大廳點「領取今日勳章」', 'var(--orange)');
+          } else {
+            showBadgePopup('⏳', `Day ${day} · ${name}`, '今日測驗 & 打卡任務未完成：\n' + missing.join('\n'), 'var(--orange)');
+          }
+          return;
+        }
+        // missed
+        showBadgePopup('💤', `Day ${day} · ${name}`, '此日勳章未完成，可惜了！', 'rgba(255,124,42,0.6)');
+      };
+    });
+  }
+
+  // Lunch photo upload (改用 Storage)
   const lunchBtn = $('#lunch-upload-btn');
   const lunchInput = $('#lunch-photo');
   if (lunchBtn && lunchInput) {
-    let lunchBase64 = null;
+    let lunchFile = null, previewBase64 = null;
     lunchBtn.onclick = () => lunchInput.click();
     lunchInput.onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return;
+      lunchFile = f;
       try {
-        showToast('壓縮圖片中...');
-        lunchBase64 = await fileToCompressedBase64(f, 1000, 0.7);
+        previewBase64 = await fileToCompressedBase64(f, 600, 0.6); // 僅用於預覽
         $('#lunch-preview').innerHTML = `
-          <img src="${lunchBase64}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; border:2px solid var(--blue); margin-top:10px;" />
+          <img src="${previewBase64}" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; border:2px solid var(--blue); margin-top:10px;" />
           <button class="btn-primary" id="lunch-confirm" style="width:100%; margin-top:10px;">✓ 確認打卡</button>
         `;
-        $('#lunch-confirm').onclick = () => checkIn('lunch', lunchBase64);
+        $('#lunch-confirm').onclick = async () => {
+          const btn = $('#lunch-confirm');
+          btn.disabled = true;
+          btn.textContent = '上傳中...';
+          try {
+            const { photoUrl, thumbUrl } = await uploadPhotoWithThumb(lunchFile, state.user.id);
+            await checkIn('lunch', photoUrl, thumbUrl);
+          } catch (err) {
+            showToast(err.message || '上傳失敗', 'error');
+            btn.disabled = false;
+            btn.textContent = '✓ 確認打卡';
+          }
+        };
       } catch { showToast('圖片處理失敗', 'error'); }
     };
   }
