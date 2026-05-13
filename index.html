@@ -1950,8 +1950,14 @@ function aiReportCard(rep) {
   `;
 }
 
-function reportCard(rec, r) {
-  if (!r) r = generateReport(rec, null);
+function reportCard(rec, rOrPrev) {
+  // 智能判斷第二個參數：若有 cid 欄位則是 report 物件，否則視為 prev record
+  let r;
+  if (rOrPrev && rOrPrev.cid) {
+    r = rOrPrev;
+  } else {
+    r = generateReport(rec, rOrPrev || null);
+  }
   return `
   <div class="card-cyber mx-4 mt-2 fade-in">
     <div class="font-display glow-orange" style="font-size:20px;">📊 體組成報告</div>
