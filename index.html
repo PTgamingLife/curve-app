@@ -387,16 +387,18 @@ const ISHARE_URLS = {
   PROTEIN:    'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39502',  // 優質蛋白素系列
   B_VITAMIN:  'https://www.amway.com.tw/iShare/Monthly/Inner/41272/41278',  // 維生素B
   IRON_FOLIC: 'https://www.amway.com.tw/iShare/Monthly/Inner/41272/41281',  // 鐵、葉酸
+  VIT_A:      'https://www.amway.com.tw/iShare/Post/Detail/38355',          // 維生素A
   VIT_C:      'https://www.amway.com.tw/iShare/Post/Detail/27066',          // 強效C營養片
   CAL_MAG_D:  'https://www.amway.com.tw/iShare/Post/Detail/25626',          // 加美D鈣片（鈣/鎂/維D）
   FISH_OIL:   'https://www.amway.com.tw/iShare/Monthly/Inner/25020/25061',  // 複合魚油（Omega-3）
-  PROBIOTIC:  'https://www.amway.com.tw/iShare/Monthly/Inner/39139/39292',  // 益生菌
+  PROBIOTIC:  'https://www.amway.com.tw/iShare/Post/Detail/40425',          // 益生菌（新版）
   FIBER:      'https://www.amway.com.tw/iShare/Monthly/Inner/40556/40567',  // 膳食纖維
   MULTIVIT:   'https://www.amway.com.tw/iShare/Monthly/Inner/24697/24698',  // Double X 蔬果綜合
   VIT_MIN:    'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39509',   // 維生素礦物質系列
   FUNCTIONAL: 'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39514',   // 機能保健系列
   CRANBERRY:  'https://www.amway.com.tw/iShare/Post/Detail/37679',          // 蔓越莓女士益生菌
   ECHINACEA:  'https://www.amway.com.tw/iShare/Post/Tags/11366',            // 紫錐花
+  MEAL_SUB:   'https://www.amway.com.tw/iShare/Post/Detail/42508',          // 減脂代餐
   ISHARE_HOME:'https://www.amway.com.tw/iShare',
 };
 
@@ -446,9 +448,12 @@ const NUTRIENT_ISHARE_URLS = {
   '類黃酮': ISHARE_URLS.MULTIVIT, '茄紅素': ISHARE_URLS.MULTIVIT, '花青素': ISHARE_URLS.MULTIVIT,
   '蔬果': ISHARE_URLS.MULTIVIT,
 
+  // 維生素 A（專屬連結）
+  '維生素a': ISHARE_URLS.VIT_A, '維他命a': ISHARE_URLS.VIT_A, 'vita': ISHARE_URLS.VIT_A,
+  'β胡蘿蔔素': ISHARE_URLS.VIT_A, '胡蘿蔔素': ISHARE_URLS.VIT_A, '視黃醇': ISHARE_URLS.VIT_A,
+
   // 維生素 E / 硒 / 其他礦物質 → 維生素礦物質系列
   '維生素e': ISHARE_URLS.VIT_MIN, '維他命e': ISHARE_URLS.VIT_MIN,
-  '維生素a': ISHARE_URLS.VIT_MIN, '維他命a': ISHARE_URLS.VIT_MIN,
   '維生素k': ISHARE_URLS.VIT_MIN, '維他命k': ISHARE_URLS.VIT_MIN,
   '硒': ISHARE_URLS.VIT_MIN, '鋅': ISHARE_URLS.VIT_MIN, '銅': ISHARE_URLS.VIT_MIN,
   '錳': ISHARE_URLS.VIT_MIN, '鉻': ISHARE_URLS.VIT_MIN, '鉀': ISHARE_URLS.VIT_MIN,
@@ -469,6 +474,12 @@ const NUTRIENT_ISHARE_URLS = {
   // 特殊類
   '蔓越莓': ISHARE_URLS.CRANBERRY, '女性私密': ISHARE_URLS.CRANBERRY,
   '紫錐花': ISHARE_URLS.ECHINACEA, '免疫': ISHARE_URLS.ECHINACEA,
+
+  // 減脂代餐 / 飽足感 / 控制熱量
+  '代餐': ISHARE_URLS.MEAL_SUB, '減脂代餐': ISHARE_URLS.MEAL_SUB,
+  '飽足': ISHARE_URLS.MEAL_SUB, '熱量控制': ISHARE_URLS.MEAL_SUB,
+  '體重管理': ISHARE_URLS.MEAL_SUB, '減重': ISHARE_URLS.MEAL_SUB,
+  '低熱量': ISHARE_URLS.MEAL_SUB, '高纖飽足': ISHARE_URLS.MEAL_SUB,
 };
 
 function getNutrientLink(name) {
