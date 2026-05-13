@@ -381,6 +381,39 @@ const BADGE_NAMES = [
 ];
 const LEVEL_THRESHOLDS = [0, 200, 500, 900, 1400, 2000, 2800];
 
+// 紐崔萊產品 iShare 連結對照表（依營養素名稱）
+// 未列出的營養素會連到 iShare 主頁
+const NUTRIENT_ISHARE_URLS = {
+  '蛋白質': 'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39502',
+  '蛋白': 'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39502',
+  // 之後可以由後台陸續補上其他營養素對應連結
+  // 'B群': '...',
+  // '維生素C': '...',
+  // '維生素D': '...',
+  // '鈣': '...',
+  // '鐵': '...',
+  // '鎂': '...',
+  // '鋅': '...',
+  // '硒': '...',
+  // 'Omega-3': '...',
+  // '膳食纖維': '...',
+  // '植物多酚': '...',
+  // '抗氧化': '...',
+  // '膽鹼': '...',
+  // '肌醇': '...',
+};
+const ISHARE_HOME = 'https://www.amway.com.tw/iShare';
+
+function getNutrientLink(name) {
+  if (!name) return ISHARE_HOME;
+  // 模糊比對：去除空白和符號後比對
+  const normalized = name.replace(/[\s（）()\-　]/g, '');
+  for (const [key, url] of Object.entries(NUTRIENT_ISHARE_URLS)) {
+    if (normalized.includes(key) || key.includes(normalized)) return url;
+  }
+  return ISHARE_HOME;
+}
+
 // ============ AUDIO ============
 const audioCtx = (() => {
   try { return new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
@@ -1455,6 +1488,17 @@ const pages = {
           🏅 領取今日勳章 · ${BADGE_NAMES[day-1][0]}
         </button>
       ` : ''}
+
+      <!-- 登出按鈕 -->
+      <div style="margin-top:32px; padding-top:20px; border-top:1px dashed rgba(255,255,255,0.1); text-align:center;">
+        <div style="font-size:11px; color:rgba(255,255,255,0.4); margin-bottom:10px;">登入身分：${state.user.name} (${state.user.phone})</div>
+        <button id="logout-btn" style="
+          background:transparent; border:1.5px solid rgba(255,255,255,0.3);
+          color:rgba(255,255,255,0.7); padding:10px 24px; border-radius:24px;
+          font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+          transition: all 0.2s;
+        ">🚪 登出帳號</button>
+      </div>
     </div>
     `;
   },
@@ -1847,26 +1891,23 @@ function aiReportCard(rep) {
   <div class="card-cyber mx-4 mt-2">
     <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">💊 個人化營養素建議</div>
     ${(rep.nutrients || []).map(n => {
-      const product = n.product || n.foods || '';
-      const searchUrl = `https://www.amway.com.tw/search?searchTerm=${encodeURIComponent(product)}`;
+      const url = getNutrientLink(n.name);
       return `
       <div style="background:rgba(0,0,0,0.4); padding:10px 12px; border-radius:8px; margin-bottom:6px;">
         <div style="font-weight:700; color:var(--orange); font-size:13px;">${n.name}</div>
         <div style="font-size:12px; line-height:1.5; margin-top:3px;">${n.reason}</div>
-        ${product ? `
-          <a href="${searchUrl}" target="_blank" rel="noopener" style="
-            display:inline-flex; align-items:center; gap:5px; margin-top:8px;
-            background:linear-gradient(135deg, #00529c, #0066cc);
-            color:#fff; text-decoration:none;
-            padding:6px 12px; border-radius:18px; font-size:12px; font-weight:700;
-            border:1px solid rgba(255,255,255,0.2);
-            box-shadow:0 2px 8px rgba(0,82,156,0.4);
-          ">🛒 ${product} <span style="font-size:10px; opacity:0.7;">↗ 安麗</span></a>
-        ` : ''}
+        <a href="${url}" target="_blank" rel="noopener" style="
+          display:inline-flex; align-items:center; gap:6px; margin-top:8px;
+          background:linear-gradient(135deg, #00529c, #0066cc);
+          color:#fff; text-decoration:none;
+          padding:6px 14px; border-radius:18px; font-size:12px; font-weight:700;
+          border:1px solid rgba(255,255,255,0.2);
+          box-shadow:0 2px 8px rgba(0,82,156,0.4);
+        ">🛒 ${n.name} <span style="font-size:10px; opacity:0.8;">· 安麗 iShare ↗</span></a>
       </div>`;
     }).join('')}
     <div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:6px; text-align:center;">
-      點擊產品名稱前往 安麗 amway.com.tw 查看
+      點擊按鈕前往 安麗 iShare 查看對應營養品
     </div>
   </div>
 
@@ -2865,7 +2906,20 @@ function attachListeners() {
 
   if (state.page === 'rank') renderRankContent();
   if (state.page === 'photowall') renderPhotoWallContent();
-  if (state.page === 'home') updateHomeHearts();
+  if (state.page === 'home') {
+    updateHomeHearts();
+    const logoutBtn = $('#logout-btn');
+    if (logoutBtn) logoutBtn.onclick = () => {
+      if (!confirm('確定要登出嗎？')) return;
+      localStorage.removeItem('smr_phone');
+      state.user = null;
+      state.bodyRecords = []; state.quizRecords = []; state.mealCheckins = []; state.badges = [];
+      state.canClaimBadge = null; _lastHeartCount = null;
+      state.loginStep = 'phone'; state.page = 'login';
+      showToast('已登出');
+      render();
+    };
+  }
 
   // 勳章點擊
   if (state.page === 'badges') {
