@@ -381,37 +381,108 @@ const BADGE_NAMES = [
 ];
 const LEVEL_THRESHOLDS = [0, 200, 500, 900, 1400, 2000, 2800];
 
-// 紐崔萊產品 iShare 連結對照表（依營養素名稱）
-// 未列出的營養素會連到 iShare 主頁
-const NUTRIENT_ISHARE_URLS = {
-  '蛋白質': 'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39502',
-  '蛋白': 'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39502',
-  // 之後可以由後台陸續補上其他營養素對應連結
-  // 'B群': '...',
-  // '維生素C': '...',
-  // '維生素D': '...',
-  // '鈣': '...',
-  // '鐵': '...',
-  // '鎂': '...',
-  // '鋅': '...',
-  // '硒': '...',
-  // 'Omega-3': '...',
-  // '膳食纖維': '...',
-  // '植物多酚': '...',
-  // '抗氧化': '...',
-  // '膽鹼': '...',
-  // '肌醇': '...',
+// 紐崔萊產品 iShare 連結對照表 — 依基本人體營養素整理
+// 找不到的營養素會連到「維生素礦物質系列」主頁
+const ISHARE_URLS = {
+  PROTEIN:    'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39502',  // 優質蛋白素系列
+  B_VITAMIN:  'https://www.amway.com.tw/iShare/Monthly/Inner/41272/41278',  // 維生素B
+  IRON_FOLIC: 'https://www.amway.com.tw/iShare/Monthly/Inner/41272/41281',  // 鐵、葉酸
+  VIT_C:      'https://www.amway.com.tw/iShare/Post/Detail/27066',          // 強效C營養片
+  CAL_MAG_D:  'https://www.amway.com.tw/iShare/Post/Detail/25626',          // 加美D鈣片（鈣/鎂/維D）
+  FISH_OIL:   'https://www.amway.com.tw/iShare/Monthly/Inner/25020/25061',  // 複合魚油（Omega-3）
+  PROBIOTIC:  'https://www.amway.com.tw/iShare/Monthly/Inner/39139/39292',  // 益生菌
+  FIBER:      'https://www.amway.com.tw/iShare/Monthly/Inner/40556/40567',  // 膳食纖維
+  MULTIVIT:   'https://www.amway.com.tw/iShare/Monthly/Inner/24697/24698',  // Double X 蔬果綜合
+  VIT_MIN:    'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39509',   // 維生素礦物質系列
+  FUNCTIONAL: 'https://www.amway.com.tw/iShare/Monthly/Inner/8098/39514',   // 機能保健系列
+  CRANBERRY:  'https://www.amway.com.tw/iShare/Post/Detail/37679',          // 蔓越莓女士益生菌
+  ECHINACEA:  'https://www.amway.com.tw/iShare/Post/Tags/11366',            // 紫錐花
+  ISHARE_HOME:'https://www.amway.com.tw/iShare',
 };
-const ISHARE_HOME = 'https://www.amway.com.tw/iShare';
+
+// 營養素名稱 → URL 對照（key 為小寫關鍵字，會做模糊比對）
+const NUTRIENT_ISHARE_URLS = {
+  // 蛋白質類
+  '蛋白': ISHARE_URLS.PROTEIN, '蛋白質': ISHARE_URLS.PROTEIN, '優質蛋白': ISHARE_URLS.PROTEIN,
+  '胺基酸': ISHARE_URLS.PROTEIN, '氨基酸': ISHARE_URLS.PROTEIN,
+
+  // 維生素 B 群
+  'b群': ISHARE_URLS.B_VITAMIN, 'B群': ISHARE_URLS.B_VITAMIN,
+  '維生素b': ISHARE_URLS.B_VITAMIN, '維他命b': ISHARE_URLS.B_VITAMIN,
+  'b1': ISHARE_URLS.B_VITAMIN, 'b2': ISHARE_URLS.B_VITAMIN, 'b3': ISHARE_URLS.B_VITAMIN,
+  'b6': ISHARE_URLS.B_VITAMIN, 'b12': ISHARE_URLS.B_VITAMIN,
+  '菸鹼酸': ISHARE_URLS.B_VITAMIN, '泛酸': ISHARE_URLS.B_VITAMIN, '生物素': ISHARE_URLS.B_VITAMIN,
+  '硫胺素': ISHARE_URLS.B_VITAMIN, '核黃素': ISHARE_URLS.B_VITAMIN,
+
+  // 鐵 + 葉酸
+  '鐵': ISHARE_URLS.IRON_FOLIC, '鐵質': ISHARE_URLS.IRON_FOLIC,
+  '葉酸': ISHARE_URLS.IRON_FOLIC, '造血': ISHARE_URLS.IRON_FOLIC,
+
+  // 維生素 C
+  '維生素c': ISHARE_URLS.VIT_C, '維他命c': ISHARE_URLS.VIT_C, 'vitc': ISHARE_URLS.VIT_C,
+  '抗壞血酸': ISHARE_URLS.VIT_C,
+
+  // 鈣 / 鎂 / 維生素 D
+  '鈣': ISHARE_URLS.CAL_MAG_D, '鎂': ISHARE_URLS.CAL_MAG_D,
+  '維生素d': ISHARE_URLS.CAL_MAG_D, '維他命d': ISHARE_URLS.CAL_MAG_D, 'vitd': ISHARE_URLS.CAL_MAG_D,
+  '骨骼': ISHARE_URLS.CAL_MAG_D, '骨質': ISHARE_URLS.CAL_MAG_D,
+
+  // Omega-3 / 魚油
+  'omega': ISHARE_URLS.FISH_OIL, '魚油': ISHARE_URLS.FISH_OIL,
+  'epa': ISHARE_URLS.FISH_OIL, 'dha': ISHARE_URLS.FISH_OIL,
+  '不飽和脂肪酸': ISHARE_URLS.FISH_OIL, 'ω-3': ISHARE_URLS.FISH_OIL,
+
+  // 益生菌
+  '益生菌': ISHARE_URLS.PROBIOTIC, '益菌': ISHARE_URLS.PROBIOTIC,
+  '腸道': ISHARE_URLS.PROBIOTIC, '腸胃': ISHARE_URLS.PROBIOTIC,
+
+  // 膳食纖維
+  '膳食纖維': ISHARE_URLS.FIBER, '纖維': ISHARE_URLS.FIBER, '果膠': ISHARE_URLS.FIBER,
+
+  // 綜合 / 抗氧化 / 植化素
+  '綜合維他命': ISHARE_URLS.MULTIVIT, '綜合維生素': ISHARE_URLS.MULTIVIT,
+  '抗氧化': ISHARE_URLS.MULTIVIT, '植化素': ISHARE_URLS.MULTIVIT,
+  '植物多酚': ISHARE_URLS.MULTIVIT, '多酚': ISHARE_URLS.MULTIVIT,
+  '類黃酮': ISHARE_URLS.MULTIVIT, '茄紅素': ISHARE_URLS.MULTIVIT, '花青素': ISHARE_URLS.MULTIVIT,
+  '蔬果': ISHARE_URLS.MULTIVIT,
+
+  // 維生素 E / 硒 / 其他礦物質 → 維生素礦物質系列
+  '維生素e': ISHARE_URLS.VIT_MIN, '維他命e': ISHARE_URLS.VIT_MIN,
+  '維生素a': ISHARE_URLS.VIT_MIN, '維他命a': ISHARE_URLS.VIT_MIN,
+  '維生素k': ISHARE_URLS.VIT_MIN, '維他命k': ISHARE_URLS.VIT_MIN,
+  '硒': ISHARE_URLS.VIT_MIN, '鋅': ISHARE_URLS.VIT_MIN, '銅': ISHARE_URLS.VIT_MIN,
+  '錳': ISHARE_URLS.VIT_MIN, '鉻': ISHARE_URLS.VIT_MIN, '鉀': ISHARE_URLS.VIT_MIN,
+  '碘': ISHARE_URLS.VIT_MIN, '鉬': ISHARE_URLS.VIT_MIN, '礦物質': ISHARE_URLS.VIT_MIN,
+  '微量元素': ISHARE_URLS.VIT_MIN,
+
+  // 機能保健（單方）
+  '葉黃素': ISHARE_URLS.FUNCTIONAL, '玉米黃素': ISHARE_URLS.FUNCTIONAL,
+  '銀杏': ISHARE_URLS.FUNCTIONAL, '卵磷脂': ISHARE_URLS.FUNCTIONAL,
+  '大蒜': ISHARE_URLS.FUNCTIONAL, '大蒜素': ISHARE_URLS.FUNCTIONAL,
+  '蜂膠': ISHARE_URLS.FUNCTIONAL,
+  '月見草': ISHARE_URLS.FUNCTIONAL, 'gla': ISHARE_URLS.FUNCTIONAL, '琉璃苣': ISHARE_URLS.FUNCTIONAL,
+  '當歸': ISHARE_URLS.FUNCTIONAL, '人參': ISHARE_URLS.FUNCTIONAL,
+  '輔酶': ISHARE_URLS.FUNCTIONAL, 'q10': ISHARE_URLS.FUNCTIONAL,
+  '膠原蛋白': ISHARE_URLS.FUNCTIONAL, '葡萄糖胺': ISHARE_URLS.FUNCTIONAL,
+  '薑黃': ISHARE_URLS.FUNCTIONAL, '兒茶素': ISHARE_URLS.FUNCTIONAL,
+
+  // 特殊類
+  '蔓越莓': ISHARE_URLS.CRANBERRY, '女性私密': ISHARE_URLS.CRANBERRY,
+  '紫錐花': ISHARE_URLS.ECHINACEA, '免疫': ISHARE_URLS.ECHINACEA,
+};
 
 function getNutrientLink(name) {
-  if (!name) return ISHARE_HOME;
-  // 模糊比對：去除空白和符號後比對
-  const normalized = name.replace(/[\s（）()\-　]/g, '');
+  if (!name) return ISHARE_URLS.VIT_MIN;
+  // 正規化：小寫、去空白與全形符號
+  const normalized = name.toLowerCase().replace(/[\s（）()\-　_+&]/g, '');
+  // 1. 完全比對
+  if (NUTRIENT_ISHARE_URLS[normalized]) return NUTRIENT_ISHARE_URLS[normalized];
+  // 2. 模糊比對：找出包含此關鍵字或被此關鍵字包含的條目
   for (const [key, url] of Object.entries(NUTRIENT_ISHARE_URLS)) {
-    if (normalized.includes(key) || key.includes(normalized)) return url;
+    if (normalized.includes(key.toLowerCase()) || key.toLowerCase().includes(normalized)) return url;
   }
-  return ISHARE_HOME;
+  // 3. 預設：維生素礦物質系列主頁
+  return ISHARE_URLS.VIT_MIN;
 }
 
 // ============ AUDIO ============
