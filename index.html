@@ -68,13 +68,13 @@ body::before {
 }
 @keyframes floatY {
   0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
-  50%      { transform: translateY(var(--dy, -16px)) rotate(calc(var(--rot, 0deg) + var(--spin, 3deg))); }
+  50%      { transform: translateY(calc(var(--dy, -16px) * 2)) rotate(calc(var(--rot, 0deg) + var(--spin, 6deg))); }
 }
 @keyframes floatXY {
   0%   { transform: translate(0,0) rotate(var(--rot, 0deg)); }
-  25%  { transform: translate(var(--dx, 8px), var(--dy, -10px)) rotate(calc(var(--rot, 0deg) + 4deg)); }
-  50%  { transform: translate(0, var(--dy, -20px)) rotate(calc(var(--rot, 0deg) - 2deg)); }
-  75%  { transform: translate(calc(var(--dx, 8px) * -1), var(--dy, -10px)) rotate(calc(var(--rot, 0deg) + 2deg)); }
+  25%  { transform: translate(calc(var(--dx, 8px) * 2), calc(var(--dy, -10px) * 2)) rotate(calc(var(--rot, 0deg) + 8deg)); }
+  50%  { transform: translate(0, calc(var(--dy, -20px) * 2)) rotate(calc(var(--rot, 0deg) - 4deg)); }
+  75%  { transform: translate(calc(var(--dx, 8px) * -2), calc(var(--dy, -10px) * 2)) rotate(calc(var(--rot, 0deg) + 4deg)); }
   100% { transform: translate(0,0) rotate(var(--rot, 0deg)); }
 }
 .deco-float {
