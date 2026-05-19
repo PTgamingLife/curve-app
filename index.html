@@ -21,7 +21,7 @@
 <meta property="og:description" content="紐崔萊 × Ready Player One — 28 天減脂挑戰" />
 <meta property="og:type" content="website" />
 
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Caveat:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -569,8 +569,11 @@ const state = {
   mealCheckins: [],
   badges: [],
   todayQuiz: null,
-  loginStep: 'phone', // phone, register, login
+  loginStep: 'phone', // phone, register, pin, login
   registerData: {},
+  loginPending: null, // PIN 驗證前暫存使用者資料
+  adminAuthed: false,
+  adminPwd: '',       // 後台密碼暫存於記憶體（不寫 localStorage）
   rankTab: 'fat',
   recordTab: 'chart',
   quizState: null, // { day, options, selected, answered, correct }
@@ -932,8 +935,9 @@ async function ensureCleanupFresh() {
 
 // ============ DATA ============
 async function loadConfig() {
-  const { data } = await sb.from('smr_game_config').select('*').eq('id', 1).single();
-  state.config = data;
+  // 使用 SECURITY DEFINER RPC，不直接讀 game_config（已啟用 RLS 保護 api_key / admin_pwd_hash）
+  const { data } = await sb.rpc('smr_get_public_config');
+  state.config = Array.isArray(data) ? data[0] : data;
 }
 
 async function loadUserData() {
@@ -965,7 +969,9 @@ async function loadPhotoWall(forceRefresh = false) {
   const { data: checkins } = await sb.from('smr_meal_checkins')
     .select('id, user_id, checkin_date, photo_url, thumb_url, created_at')
     .eq('checkin_date', day)
-    .not('photo_url', 'is', null);
+    .not('photo_url', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(100); // 每天最多顯示 100 張，避免尖峰流量過高
 
   if (!checkins?.length) { _photoWallCache = []; return []; }
 
@@ -1556,8 +1562,7 @@ function setAIStatus(msg) {
 }
 
 async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
-  const key = state.config?.claude_api_key;
-  if (!key) throw new Error('Claude API 金鑰未設定，請聯絡管理員');
+  // API Key 由 Supabase Edge Function 管理，前端完全不接觸金鑰
 
   const userGender = state.user.gender || 'male';
   const userBirth = state.user.birthdate || '';
@@ -1702,7 +1707,8 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
   };
 
   const MAX_ATTEMPTS = 8;
-  const url = 'https://api.anthropic.com/v1/messages';
+  // 透過 Edge Function 代理（API key 在伺服器端，前端看不到）
+  const url = `${SUPABASE_URL}/functions/v1/ai-analyze`;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -1710,9 +1716,7 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
         },
         body: JSON.stringify(body)
       });
@@ -1824,8 +1828,8 @@ async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
         const { data: dispatched } = await sb.rpc('smr_try_dispatch', { queue_id: queueId });
         if (dispatched) break;
       }
-      // 輪詢間隔：位置越前越頻繁
-      const waitMs = myPos <= 3 ? 1500 : myPos <= 10 ? 2500 : 4000;
+      // 輪詢間隔：位置越前越頻繁（加大間隔降低 150 人同時輪詢的負載）
+      const waitMs = myPos <= 3 ? 2500 : myPos <= 10 ? 4000 : 6000;
       await new Promise(r => setTimeout(r, waitMs));
     }
 
@@ -3334,6 +3338,48 @@ function renderLogin() {
     $('#login-phone').onkeydown = (e) => { if (e.key === 'Enter') handlePhoneSubmit(); };
     return;
   }
+  if (step === 'pin') {
+    const u = state.loginPending;
+    app.innerHTML = `
+      <div class="flex-1 fade-in" style="display:flex; flex-direction:column; padding:40px 24px; min-height:100vh;">
+        <button id="back-btn" style="background:none; border:none; color:var(--blue); cursor:pointer; font-family:inherit;">‹ 返回</button>
+        <div style="margin-top:40px; text-align:center;">
+          <div style="font-size:48px;">${u?.avatar || '👤'}</div>
+          <div class="font-display" style="font-size:22px; margin-top:8px;">${u?.name || ''}</div>
+          <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">請輸入您的 PIN 碼登入</div>
+        </div>
+        <div style="margin-top:40px;">
+          <input id="pin-input" class="input-cyber" type="tel" maxlength="6"
+            placeholder="• • • •" style="text-align:center; font-size:28px; letter-spacing:12px;" />
+          <button class="btn-primary" id="pin-submit" style="width:100%; margin-top:16px;">確認登入</button>
+          <div style="text-align:center; margin-top:12px;">
+            <button id="pin-forgot" style="background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; font-family:inherit;">
+              忘記 PIN？請聯絡主辦單位重置
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    $('#back-btn').onclick = () => { state.loginStep = 'phone'; state.loginPending = null; render(); };
+    $('#pin-input').onkeydown = (e) => { if (e.key === 'Enter') $('#pin-submit').click(); };
+    $('#pin-forgot').onclick = () => showToast('請聯絡主辦單位，後台可重置您的 PIN', 'error');
+    $('#pin-submit').onclick = async () => {
+      const pin = $('#pin-input').value.trim();
+      if (!pin) return showToast('請輸入 PIN 碼', 'error');
+      const btn = $('#pin-submit');
+      btn.disabled = true; btn.textContent = '驗證中...';
+      const { data: ok } = await sb.rpc('smr_verify_user_pin', { p_user_id: u.id, p_pin: pin });
+      if (ok) {
+        state.loginPending = null;
+        await completeLogin(u);
+      } else {
+        showToast('PIN 碼錯誤，請再試一次', 'error');
+        btn.disabled = false; btn.textContent = '確認登入';
+        $('#pin-input').value = '';
+      }
+    };
+    return;
+  }
   if (step === 'register') {
     app.innerHTML = `
       <div class="flex-1 fade-in" style="padding:40px 24px;">
@@ -3376,6 +3422,14 @@ function renderLogin() {
             </div>
           </div>
 
+          <div>
+            <label style="font-size:13px; color:var(--primary); font-weight:700;">🔒 設定個人 PIN 碼（必填）</label>
+            <input id="reg-pin" class="input-cyber mt-1" type="tel" maxlength="6" placeholder="4～6 位數字" />
+            <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.4;">
+              往後每次登入需輸入 PIN 碼，請勿與他人分享
+            </div>
+          </div>
+
           <!-- 開賽前體重照片（必填） -->
           <div style="background:var(--mint-l); border-radius:14px; padding:12px; border:1.5px dashed var(--mint);">
             <label style="font-size:13px; color:var(--primary); font-weight:900;">📷 開賽前體重秤照片（必填）</label>
@@ -3386,6 +3440,16 @@ function renderLogin() {
             <button type="button" id="reg-weight-btn" class="btn-cyber" style="width:100%; margin-top:10px;">📸 拍照 / 選擇照片</button>
             <div id="reg-weight-preview"></div>
           </div>
+
+          <!-- Risk 4: 隱私同意 -->
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; background:var(--sun-l); border-radius:12px; padding:12px; border:1.5px solid var(--sun);">
+            <input type="checkbox" id="reg-consent" style="margin-top:2px; flex-shrink:0; width:18px; height:18px;" />
+            <span style="font-size:12px; color:var(--ink); line-height:1.6;">
+              我了解本活動將收集個人健康資料（姓名、電話、生日、體重、體脂、照片），
+              僅用於 28 天競賽排名與 AI 健康分析，活動結束後可申請刪除。
+              <a href="mailto:主辦單位信箱" style="color:var(--blue);">聯絡主辦單位</a>
+            </span>
+          </label>
 
           <button id="reg-submit" class="btn-primary" style="margin-top:16px;">完成註冊 · 開始挑戰</button>
         </div>
@@ -3424,25 +3488,32 @@ function renderLogin() {
       const pwd = $('#reg-pwd').value;
       const birthdate = $('#reg-birthdate').value;
       const gender = $('#reg-gender').value;
+      const pin = $('#reg-pin').value.trim();
+      const consent = $('#reg-consent').checked;
       if (!name) return showToast('請輸入姓名', 'error');
-      if (!pwd) return showToast('請輸入密碼', 'error');
+      if (!pwd) return showToast('請輸入報名密碼', 'error');
       if (!birthdate) return showToast('請選擇生日', 'error');
       if (!gender) return showToast('請選擇性別', 'error');
+      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('請設定 4～6 位數字 PIN 碼', 'error');
+      if (!consent) return showToast('請閱讀並勾選隱私同意', 'error');
       if (!weightPhotoFile) return showToast('請上傳開賽前體重照片', 'error');
 
       const btn = $('#reg-submit');
       btn.disabled = true; btn.textContent = '上傳照片中...';
       try {
-        // 先用臨時 user ID 作為檔名（用 phone 代替 UUID）
-        const ts = Date.now();
         const folderId = state.registerData.phone || 'unknown';
         const { photoUrl } = await uploadPhotoWithThumb(weightPhotoFile, `register/${folderId}`);
         weightPhotoUrl = photoUrl;
 
         btn.textContent = '註冊中...';
-        await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
-        showToast('🎉 歡迎加入！');
+        const newUser = await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
+        // 設定 PIN（SECURITY DEFINER RPC，hash 不暴露前端）
+        if (newUser?.id) {
+          await sb.rpc('smr_set_user_pin', { p_user_id: newUser.id, p_pin: pin });
+        }
+        showToast('🎉 歡迎加入！PIN 碼已設定');
         state.page = 'home'; render();
+        ensureCleanupFresh();
       } catch (e) {
         btn.disabled = false; btn.textContent = '完成註冊 · 開始挑戰';
         showToast(e.message || '註冊失敗', 'error');
@@ -3458,15 +3529,30 @@ async function handlePhoneSubmit() {
   sfx.click();
   const existing = await checkPhone(phone);
   if (existing) {
-    state.user = existing;
-    localStorage.setItem('smr_phone', phone);
-    await loadUserData(); await loadTodayQuiz();
-    showToast(`👋 歡迎回來 ${existing.name}`);
-    state.page = 'home'; render();
+    if (existing.pin_hash) {
+      // 已設 PIN → 進入 PIN 驗證步驟
+      state.loginPending = existing;
+      state.loginStep = 'pin';
+      render();
+    } else {
+      // 尚未設 PIN（舊玩家寬限期）→ 直接登入，提示設定
+      await completeLogin(existing);
+      showToast('⚠️ 請至「個人資料」設定 PIN 碼以保護帳戶', 'error');
+    }
   } else {
     state.registerData = { phone };
     state.loginStep = 'register'; render();
   }
+}
+
+async function completeLogin(user) {
+  state.user = user;
+  localStorage.setItem('smr_phone', user.phone);
+  await loadUserData();
+  await loadTodayQuiz();
+  showToast(`👋 歡迎回來 ${user.name}`);
+  state.page = 'home'; render();
+  ensureCleanupFresh();
 }
 
 // ============ ADMIN ============
@@ -3479,20 +3565,33 @@ function renderAdmin() {
         <div class="font-handwrite glow-blue" style="font-size:18px;">後台登入</div>
 
         <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
-          <input id="ad-acc" class="input-cyber" placeholder="帳號" />
-          <input id="ad-pwd" class="input-cyber" type="password" placeholder="密碼" />
+          <input id="ad-pwd" class="input-cyber" type="password" placeholder="後台密碼" />
           <button class="btn-primary" id="ad-login">登入後台</button>
+          <div style="font-size:11px; color:var(--ink-soft); text-align:center; margin-top:-4px;">
+            密碼儲存於伺服器端，原始碼中不含帳密資訊
+          </div>
         </div>
       </div>
     `;
     $('#back-btn').onclick = () => { state.page = 'login'; render(); };
-    $('#ad-login').onclick = () => {
-      const acc = $('#ad-acc').value.trim();
+    $('#ad-login').onclick = async () => {
       const pwd = $('#ad-pwd').value;
-      if (acc === '0916818241' && pwd === 'Q12crown') {
-        state.adminAuthed = true; render();
-      } else {
-        showToast('帳號或密碼錯誤', 'error');
+      if (!pwd) return showToast('請輸入密碼', 'error');
+      const btn = $('#ad-login');
+      btn.disabled = true; btn.textContent = '驗證中...';
+      try {
+        const { data: ok } = await sb.rpc('smr_check_admin', { p_pwd: pwd });
+        if (ok) {
+          state.adminAuthed = true;
+          state.adminPwd = pwd; // 暫存於記憶體，用於後續寫入操作
+          render();
+        } else {
+          showToast('密碼錯誤', 'error');
+          btn.disabled = false; btn.textContent = '登入後台';
+        }
+      } catch (e) {
+        showToast('驗證失敗：' + e.message, 'error');
+        btn.disabled = false; btn.textContent = '登入後台';
       }
     };
     return;
@@ -3532,7 +3631,7 @@ function renderAdmin() {
       </div>
 
       <div class="card-cyber" style="margin-top:12px;">
-        <div style="font-weight:700;">⚙️ 註冊密碼</div>
+        <div style="font-weight:700;">⚙️ 報名密碼</div>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <input id="ad-regpwd" type="text" class="input-cyber" value="${state.config?.registration_password || ''}" />
           <button class="btn-cyber" id="ad-save-regpwd" style="white-space:nowrap;">儲存</button>
@@ -3541,14 +3640,25 @@ function renderAdmin() {
 
       <div class="card-cyber" style="margin-top:12px;">
         <div style="font-weight:700;">🔬 AI 分析金鑰（Claude）</div>
-        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">
-          前往 <a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue);">Anthropic Console</a> 取得 API Key (sk-ant-...)
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.5;">
+          金鑰儲存在伺服器端，前端不可見。<br>
+          前往 <a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue);">Anthropic Console</a> 取得金鑰後貼入：
         </div>
         <div style="display:flex; gap:8px; margin-top:8px;">
-          <input id="ad-aikey" type="password" class="input-cyber" value="${state.config?.claude_api_key || ''}" placeholder="sk-ant-api03-..." />
+          <input id="ad-aikey" type="password" class="input-cyber" placeholder="sk-ant-api03-..." />
           <button class="btn-cyber" id="ad-save-aikey" style="white-space:nowrap;">儲存</button>
         </div>
         <button class="btn-cyber" id="ad-reset-aiused" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#ffd166,#ff7c2a); font-size:12px; padding:8px;">↻ 重置所有玩家 AI 使用次數</button>
+      </div>
+
+      <div class="card-cyber" style="margin-top:12px;">
+        <div style="font-weight:700;">🔑 更改後台密碼</div>
+        <div style="font-size:11px; color:var(--primary); margin-top:4px;">⚠️ 請立即更改初始密碼以提升安全性</div>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          <input id="ad-oldpwd" type="password" class="input-cyber" placeholder="目前密碼" />
+          <input id="ad-newpwd" type="password" class="input-cyber" placeholder="新密碼（至少 8 字元）" />
+          <button class="btn-cyber" id="ad-save-pwd">更新後台密碼</button>
+        </div>
       </div>
 
       <div class="card-cyber" style="margin-top:12px;">
@@ -3576,37 +3686,61 @@ function renderAdmin() {
   $('#ad-save-start').onclick = async () => {
     const d = $('#ad-start').value;
     if (!d) return showToast('請選擇日期', 'error');
-    await sb.from('smr_game_config').update({ start_date: d, is_active: true }).eq('id', 1);
+    const { data: ok } = await sb.rpc('smr_admin_set_start_date', { p_pwd: state.adminPwd, p_date: d });
+    if (!ok) return showToast('驗證失敗，請重新登入後台', 'error');
     showToast('✓ 已更新開始日期');
     await loadConfig();
   };
+  // Risk 8: 重置比賽需手動輸入 "RESET" 確認，防止誤按
   $('#ad-reset').onclick = async () => {
-    if (!confirm('確定重置？將清除所有玩家進度（保留帳號）')) return;
-    await sb.from('smr_body_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('smr_quiz_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('smr_meal_checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('smr_badges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await sb.from('smr_users').update({ xp: 0, level: 1 }).neq('id', '00000000-0000-0000-0000-000000000000');
-    showToast('✓ 已重置比賽');
+    const typed = window.prompt('⚠️ 高危險操作！\n\n此操作將清除所有 150 位玩家的比賽進度（保留帳號）。\n\n請輸入 RESET 確認執行：');
+    if (typed !== 'RESET') return showToast('操作已取消（需輸入 RESET）', 'error');
+    const typed2 = window.prompt('⚠️ 最後確認！請再次輸入 RESET：');
+    if (typed2 !== 'RESET') return showToast('操作已取消', 'error');
+    try {
+      await sb.from('smr_body_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_quiz_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_meal_checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_badges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_users').update({ xp: 0, level: 1 }).neq('id', '00000000-0000-0000-0000-000000000000');
+      showToast('✓ 已重置比賽');
+    } catch (e) {
+      showToast('重置失敗：' + e.message, 'error');
+    }
   };
-  $('#ad-logout').onclick = () => { state.adminAuthed = false; state.page = 'login'; render(); };
+  $('#ad-logout').onclick = () => { state.adminAuthed = false; state.adminPwd = ''; state.page = 'login'; render(); };
   $('#ad-save-regpwd').onclick = async () => {
     const v = $('#ad-regpwd').value.trim();
     if (!v) return showToast('密碼不能為空', 'error');
-    await sb.from('smr_game_config').update({ registration_password: v }).eq('id', 1);
-    showToast('✓ 密碼已更新');
+    const { data: ok } = await sb.rpc('smr_admin_set_reg_pwd', { p_pwd: state.adminPwd, p_new_reg_pwd: v });
+    if (!ok) return showToast('驗證失敗', 'error');
+    showToast('✓ 報名密碼已更新');
     await loadConfig();
   };
   $('#ad-save-aikey').onclick = async () => {
     const v = $('#ad-aikey').value.trim();
-    await sb.from('smr_game_config').update({ claude_api_key: v }).eq('id', 1);
-    showToast('✓ Claude 金鑰已儲存');
-    await loadConfig();
+    if (!v) return showToast('請輸入 API Key', 'error');
+    const { data: ok } = await sb.rpc('smr_admin_set_api_key', { p_pwd: state.adminPwd, p_api_key: v });
+    if (!ok) return showToast('驗證失敗', 'error');
+    showToast('✓ Claude 金鑰已儲存（伺服器端）');
+    $('#ad-aikey').value = '';
   };
   $('#ad-reset-aiused').onclick = async () => {
     if (!confirm('重置所有玩家的 AI 使用次數？這會讓所有人重新獲得 1 次免費 AI 分析機會')) return;
-    await sb.from('smr_users').update({ ai_used: false }).neq('id', '00000000-0000-0000-0000-000000000000');
+    const { data: ok } = await sb.rpc('smr_admin_reset_ai_used', { p_pwd: state.adminPwd });
+    if (!ok) return showToast('驗證失敗', 'error');
     showToast('✓ 已重置所有玩家 AI 使用次數');
+  };
+  $('#ad-save-pwd').onclick = async () => {
+    const oldPwd = $('#ad-oldpwd').value;
+    const newPwd = $('#ad-newpwd').value;
+    if (!oldPwd || !newPwd) return showToast('請填入舊密碼和新密碼', 'error');
+    if (newPwd.length < 8) return showToast('新密碼至少需要 8 個字元', 'error');
+    const { data: ok } = await sb.rpc('smr_change_admin_pwd', { p_old: oldPwd, p_new: newPwd });
+    if (!ok) return showToast('舊密碼錯誤', 'error');
+    state.adminPwd = newPwd;
+    showToast('✓ 後台密碼已更新');
+    $('#ad-oldpwd').value = ''; $('#ad-newpwd').value = '';
   };
   $('#ad-quiz-import').onclick = openQuizImport;
   $('#ad-quiz-export').onclick = exportQuizMD;
@@ -4107,9 +4241,10 @@ async function init() {
       const u = await loginUser(savedPhone);
       if (u) {
         clearTimeout(failsafe);
+        // 本機快取登入（已信任設備，跳過 PIN）
         state.page = 'home'; render();
         if (typeof showIOSInstallTip === 'function') showIOSInstallTip();
-        ensureCleanupFresh(); // 每天自動清理舊打卡照片
+        ensureCleanupFresh();
         return;
       }
     }
