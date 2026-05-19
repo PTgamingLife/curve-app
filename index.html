@@ -847,6 +847,17 @@ function gameDay() {
   return Math.max(1, Math.min(28, Math.floor((now - start) / 86400000) + 1));
 }
 
+function isCompetitionEnded() {
+  if (!state.config?.start_date) return false;
+  const start = new Date(state.config.start_date);
+  const now = new Date();
+  return (now - start) / 86400000 >= 27; // 第 28 天起可結賽
+}
+
+function needsFinalVerification() {
+  return isCompetitionEnded() && state.user && !state.user.final_submitted_at;
+}
+
 // ============ DATA ============
 async function loadConfig() {
   const { data } = await sb.from('smr_game_config').select('*').eq('id', 1).single();
@@ -941,6 +952,115 @@ async function togglePin(checkinId, currentlyPinned) {
 
 let _lastHeartCount = null;
 let _heartPollTimer = null;
+
+// ============ 結賽驗證 ============
+function openFinalVerificationModal() {
+  if (document.getElementById('final-modal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'final-modal';
+  modal.style.cssText = `
+    position:fixed; inset:0; z-index:999;
+    background:rgba(45,49,66,0.55); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    overflow-y:auto;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--bg-soft); border-radius:24px; padding:24px; max-width:380px; width:100%; box-shadow:0 16px 48px rgba(0,0,0,0.25); max-height:90vh; overflow-y:auto;">
+      <div style="text-align:center;">
+        <div style="font-size:48px;">🏁</div>
+        <div class="font-display glow-orange" style="font-size:26px; margin-top:4px;">28 天賽程結束！</div>
+        <div style="font-size:13px; color:var(--ink-soft); margin-top:6px; line-height:1.5;">
+          請輸入最終體重數據 + 拍下體重秤照片作為驗證<br>
+          <b style="color:var(--primary);">完成驗證才能進入結算排名</b>
+        </div>
+      </div>
+
+      <form id="final-form" style="display:flex; flex-direction:column; gap:12px; margin-top:18px;">
+        <div>
+          <label style="font-size:13px; color:var(--mint); font-weight:700;">⚖️ 最終體重 (kg)</label>
+          <input class="input-cyber mt-1" name="weight" type="number" step="0.1" placeholder="例：63.5" required />
+        </div>
+        <div>
+          <label style="font-size:13px; color:var(--primary); font-weight:700;">🔥 最終體脂 (%)</label>
+          <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：20.5" required />
+        </div>
+        <div>
+          <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 最終肌肉量 (kg)</label>
+          <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.5" required />
+        </div>
+        <div>
+          <label style="font-size:13px; color:#E5A600; font-weight:700;">🍔 最終內臟脂肪 (1-20)</label>
+          <input class="input-cyber mt-1" name="visceral" type="number" min="1" max="20" placeholder="例：5" required />
+        </div>
+
+        <div style="background:var(--mint-l); border-radius:14px; padding:12px; border:1.5px dashed var(--mint);">
+          <label style="font-size:13px; color:var(--primary); font-weight:900;">📷 體重秤照片（必填）</label>
+          <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">拍下您現在站上體重秤的照片，作為結算憑證</div>
+          <input id="final-photo" type="file" accept="image/*" capture="environment" style="display:none;" />
+          <button type="button" id="final-photo-btn" class="btn-cyber" style="width:100%; margin-top:8px;">📸 拍照 / 選擇照片</button>
+          <div id="final-photo-preview"></div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="margin-top:8px;">🏆 提交最終結算</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  let photoFile = null;
+  $('#final-photo-btn').onclick = () => $('#final-photo').click();
+  $('#final-photo').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    photoFile = f;
+    try {
+      const preview = await fileToCompressedBase64(f, 500, 0.55);
+      $('#final-photo-preview').innerHTML = `
+        <img src="${preview}" style="width:100%; max-height:200px; object-fit:contain; border-radius:12px; border:2px solid var(--mint); margin-top:10px; background:#fff;" />
+        <div style="font-size:11px; color:var(--mint); text-align:center; margin-top:4px;">✓ 已選擇，送出時自動上傳</div>
+      `;
+    } catch { showToast('圖片處理失敗', 'error'); }
+  };
+
+  $('#final-form').onsubmit = async (e) => {
+    e.preventDefault();
+    if (!photoFile) return showToast('請上傳體重秤照片', 'error');
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; btn.textContent = '上傳照片中...';
+    try {
+      const { photoUrl } = await uploadPhotoWithThumb(photoFile, `final/${state.user.id}`);
+      btn.textContent = '結算中...';
+      await sb.from('smr_users').update({
+        final_weight: parseFloat(data.weight),
+        final_body_fat_pct: parseFloat(data.body_fat),
+        final_muscle_mass: parseFloat(data.muscle),
+        final_visceral_fat: parseInt(data.visceral),
+        final_weight_photo_url: photoUrl,
+        final_submitted_at: new Date().toISOString(),
+      }).eq('id', state.user.id);
+
+      // 更新本地 state
+      Object.assign(state.user, {
+        final_weight: parseFloat(data.weight),
+        final_body_fat_pct: parseFloat(data.body_fat),
+        final_muscle_mass: parseFloat(data.muscle),
+        final_visceral_fat: parseInt(data.visceral),
+        final_weight_photo_url: photoUrl,
+        final_submitted_at: new Date().toISOString(),
+      });
+
+      sfx.levelup();
+      showToast('🏆 結算完成！感謝參賽');
+      await addXP(100);
+      modal.remove();
+      render();
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '🏆 提交最終結算';
+      showToast(err.message || '結算失敗', 'error');
+    }
+  };
+}
 
 async function renderFriendsGrid() {
   const grid = document.getElementById('friends-grid');
@@ -2010,6 +2130,38 @@ const pages = {
       <div class="font-display" style="font-size:24px; color:var(--ink);">~${(checkinDays * 2.5).toFixed(1)} kg CO₂</div>
     </div>
 
+    <!-- 結賽驗證狀態（第 28 天起顯示）-->
+    ${isCompetitionEnded() ? `
+      <div class="px-4 mt-3">
+        ${state.user.final_submitted_at ? `
+          <div style="background:linear-gradient(135deg, var(--sun-l), #FFF0CC); border:2px solid var(--sun); border-radius:18px; padding:14px 16px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="font-size:36px;">🏆</div>
+              <div style="flex:1;">
+                <div style="font-size:11px; color:#A87900; font-weight:900; letter-spacing:1px;">結算完成</div>
+                <div class="font-display" style="font-size:18px; line-height:1; color:var(--ink);">恭喜完賽！</div>
+              </div>
+            </div>
+            <div style="margin-top:8px; font-size:12px; color:var(--ink); line-height:1.5;">
+              最終體重 <b>${state.user.final_weight} kg</b>　·　體脂 <b>${state.user.final_body_fat_pct}%</b><br>
+              📅 提交時間：${new Date(state.user.final_submitted_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
+            </div>
+          </div>
+        ` : `
+          <div class="card-orange pulse-glow" style="cursor:pointer;" id="final-prompt-card">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="font-size:36px;">🏁</div>
+              <div style="flex:1;">
+                <div style="font-size:11px; color:var(--primary); font-weight:900; letter-spacing:1px;">28 天結束</div>
+                <div class="font-display" style="font-size:18px; color:var(--ink); line-height:1;">點此提交最終結算</div>
+                <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">輸入最終數據 + 體重照片驗證</div>
+              </div>
+            </div>
+          </div>
+        `}
+      </div>
+    ` : ''}
+
     <!-- 戳一下：今日被戳次數 -->
     <div id="pokes-card" class="px-4 mt-3"></div>
 
@@ -2226,6 +2378,7 @@ const pages = {
       <h1 class="font-display glow-orange" style="font-size:28px;">RECORDS</h1>
       <div class="font-handwrite glow-blue" style="font-size:18px;">數據趨勢與健康報告</div>
     </div>
+    ${renderFinalSummaryCard()}
     <div class="px-4">
       <div class="tab-row">
         <button class="tab-btn ${state.recordTab==='chart'?'active':''}" data-rtab="chart">📈 走勢圖</button>
@@ -2640,6 +2793,86 @@ function reportCard(rec, rOrPrev) {
   </div>
   ` : ''}
   `;
+}
+
+function renderFinalSummaryCard() {
+  const u = state.user;
+  if (!u) return '';
+
+  const hasStart = u.start_weight_photo_url;
+  const hasFinal = u.final_submitted_at;
+  if (!hasStart && !hasFinal) return '';
+
+  // 找比賽初期最早一筆 body record 做開始體重
+  const startRec = state.bodyRecords?.[0];
+
+  const finalCard = hasFinal ? `
+    <div style="background:linear-gradient(135deg, var(--sun-l), #FFF0CC); border:2px solid var(--sun); border-radius:18px; padding:14px; margin:0 16px 12px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span style="font-size:24px;">🏆</span>
+        <div class="font-display" style="font-size:18px; color:var(--ink);">28 天結算 · 完賽報告</div>
+      </div>
+
+      <!-- 雙照片對比 -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+        <div style="background:#fff; border-radius:12px; padding:6px; text-align:center; border:1px solid var(--border);">
+          <div style="font-size:10px; color:var(--mint); font-weight:900; margin-bottom:4px;">📅 開賽前</div>
+          ${u.start_weight_photo_url
+            ? `<img src="${u.start_weight_photo_url}" style="width:100%; aspect-ratio:1; object-fit:contain; border-radius:8px; background:var(--bg);"/>`
+            : `<div style="aspect-ratio:1; background:var(--bg); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:11px;">無照片</div>`}
+          ${startRec ? `<div style="font-size:11px; margin-top:4px; color:var(--ink);"><b>${startRec.weight}</b> kg · 體脂 ${startRec.body_fat_pct}%</div>` : ''}
+        </div>
+        <div style="background:#fff; border-radius:12px; padding:6px; text-align:center; border:1px solid var(--primary);">
+          <div style="font-size:10px; color:var(--primary); font-weight:900; margin-bottom:4px;">🏁 結賽後</div>
+          ${u.final_weight_photo_url
+            ? `<img src="${u.final_weight_photo_url}" style="width:100%; aspect-ratio:1; object-fit:contain; border-radius:8px; background:var(--bg);"/>`
+            : ''}
+          <div style="font-size:11px; margin-top:4px; color:var(--ink);"><b>${u.final_weight}</b> kg · 體脂 ${u.final_body_fat_pct}%</div>
+        </div>
+      </div>
+
+      <!-- 進步幅度 -->
+      ${startRec ? (() => {
+        const wDiff = (u.final_weight - startRec.weight).toFixed(1);
+        const fDiff = (u.final_body_fat_pct - startRec.body_fat_pct).toFixed(1);
+        const mDiff = (u.final_muscle_mass - startRec.muscle_mass).toFixed(1);
+        const vDiff = u.final_visceral_fat - startRec.visceral_fat;
+        const fmt = (n, unit, lessIsBetter) => {
+          const v = parseFloat(n);
+          const good = lessIsBetter ? v < 0 : v > 0;
+          const sign = v >= 0 ? '+' : '';
+          return `<span style="color:${good ? 'var(--mint)' : v === 0 ? 'var(--ink-soft)' : 'var(--primary)'}; font-weight:900;">${sign}${v}${unit}</span>`;
+        };
+        return `
+          <div style="background:#fff; border-radius:12px; padding:10px 12px; font-size:13px; line-height:1.8;">
+            <div style="font-size:11px; color:var(--ink-soft); font-weight:700; margin-bottom:4px;">📊 28 天進步幅度</div>
+            體重 ${fmt(wDiff,'kg',true)} · 體脂 ${fmt(fDiff,'%',true)}<br>
+            肌肉 ${fmt(mDiff,'kg',false)} · 內臟脂肪 ${fmt(vDiff,'',true)}
+          </div>
+        `;
+      })() : ''}
+
+      <div style="font-size:10px; color:var(--ink-soft); text-align:center; margin-top:8px;">
+        提交時間：${new Date(u.final_submitted_at).toLocaleString('zh-TW')}
+      </div>
+    </div>
+  ` : '';
+
+  // 還沒結賽但已有開賽前照片 → 顯示開賽照片卡
+  const startOnlyCard = (!hasFinal && hasStart) ? `
+    <div style="background:var(--mint-l); border:2px dashed var(--mint); border-radius:18px; padding:14px; margin:0 16px 12px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <span style="font-size:20px;">📷</span>
+        <div style="font-weight:700; color:var(--ink);">開賽前體重照片</div>
+      </div>
+      <img src="${u.start_weight_photo_url}" style="width:100%; max-height:240px; object-fit:contain; background:#fff; border-radius:12px;"/>
+      <div style="font-size:11px; color:var(--ink-soft); text-align:center; margin-top:8px;">
+        ${isCompetitionEnded() ? '⏳ 等待您提交最終結算' : `比賽進行中 · Day ${gameDay()}/28`}
+      </div>
+    </div>
+  ` : '';
+
+  return finalCard + startOnlyCard;
 }
 
 function renderChart() {
@@ -3543,6 +3776,12 @@ function attachListeners() {
     updateHomeHearts();
     renderFriendsGrid();
     renderPokesCard();
+    // 結賽驗證自動跳出（限第 28 天起 + 尚未提交）
+    if (needsFinalVerification()) {
+      setTimeout(() => openFinalVerificationModal(), 600);
+    }
+    const finalCard = $('#final-prompt-card');
+    if (finalCard) finalCard.onclick = () => openFinalVerificationModal();
     const logoutBtn = $('#logout-btn');
     if (logoutBtn) logoutBtn.onclick = () => {
       if (!confirm('確定要登出嗎？')) return;
