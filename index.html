@@ -858,6 +858,78 @@ function needsFinalVerification() {
   return isCompetitionEnded() && state.user && !state.user.final_submitted_at;
 }
 
+// ============ PHOTO CLEANUP ============
+// 從完整 Storage public URL 還原存儲路徑（bucket 之後的部分）
+function storagePathFromUrl(url) {
+  if (!url) return null;
+  const marker = '/smr-photos/';
+  const idx = url.indexOf(marker);
+  return idx >= 0 ? url.slice(idx + marker.length) : null;
+}
+
+// 實際執行清理：刪除 checkin_date < today 的打卡照片
+// 保留 start / final / register 照片（不在 smr_meal_checkins）
+async function cleanupOldPhotos() {
+  try {
+    // 1. 找出所有有照片且日期 < today 的打卡記錄
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: rows, error } = await sb
+      .from('smr_meal_checkins')
+      .select('id, photo_url, thumb_url')
+      .lt('checkin_date', today)
+      .not('photo_url', 'is', null);
+
+    if (error || !rows || rows.length === 0) {
+      await sb.rpc('smr_mark_cleanup_done');
+      return { deleted: 0 };
+    }
+
+    // 2. 提取 Storage 路徑
+    const paths = [];
+    rows.forEach(r => {
+      const p1 = storagePathFromUrl(r.photo_url);
+      const p2 = storagePathFromUrl(r.thumb_url);
+      if (p1) paths.push(p1);
+      if (p2) paths.push(p2);
+    });
+
+    // 3. 從 Storage 刪除（每批最多 100 個）
+    for (let i = 0; i < paths.length; i += 100) {
+      await sb.storage.from('smr-photos').remove(paths.slice(i, i + 100));
+    }
+
+    // 4. 把 DB 裡的 photo_url / thumb_url 清空
+    const ids = rows.map(r => r.id);
+    for (let i = 0; i < ids.length; i += 200) {
+      await sb.from('smr_meal_checkins')
+        .update({ photo_url: null, thumb_url: null })
+        .in('id', ids.slice(i, i + 200));
+    }
+
+    // 5. 更新清理時間戳
+    await sb.rpc('smr_mark_cleanup_done');
+
+    console.log(`[Cleanup] 刪除 ${paths.length} 個舊照片 (${rows.length} 筆記錄)`);
+    return { deleted: rows.length };
+  } catch (e) {
+    console.warn('[Cleanup] 清理失敗：', e);
+    return { deleted: 0, error: e.message };
+  }
+}
+
+// Lazy 觸發：每天僅清理一次（類似排行榜快取機制）
+async function ensureCleanupFresh() {
+  try {
+    const { data: ageData } = await sb.rpc('smr_cleanup_age_hours');
+    const ageHours = parseFloat(ageData);
+    if (isNaN(ageHours) || ageHours > 20) {
+      cleanupOldPhotos(); // 非同步、不 await，不阻塞主流程
+    }
+  } catch (e) {
+    console.warn('[Cleanup] age check failed:', e);
+  }
+}
+
 // ============ DATA ============
 async function loadConfig() {
   const { data } = await sb.from('smr_game_config').select('*').eq('id', 1).single();
@@ -3479,6 +3551,22 @@ function renderAdmin() {
         <button class="btn-cyber" id="ad-reset-aiused" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#ffd166,#ff7c2a); font-size:12px; padding:8px;">↻ 重置所有玩家 AI 使用次數</button>
       </div>
 
+      <div class="card-cyber" style="margin-top:12px;">
+        <div style="font-weight:700;">🗑️ 照片儲存空間管理</div>
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.6;">
+          每日打卡照片只保留當天，舊照片每天自動清理一次。<br>
+          啟動登入後自動執行，或手動觸發強制清理。
+        </div>
+        <div id="ad-cleanup-status" style="margin-top:8px; font-size:12px; color:var(--ink-soft);">
+          上次清理：${state.config?.last_cleanup_at
+            ? new Date(state.config.last_cleanup_at).toLocaleString('zh-TW')
+            : '尚未清理'}
+        </div>
+        <button class="btn-cyber" id="ad-cleanup-now" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#4ECDC4,#44b89f); font-size:12px; padding:8px;">
+          🗑️ 立即清理舊打卡照片
+        </button>
+      </div>
+
       <button class="btn-cyber" id="ad-logout" style="width:100%; margin-top:16px;">登出後台</button>
     </div>
   `;
@@ -3522,6 +3610,28 @@ function renderAdmin() {
   };
   $('#ad-quiz-import').onclick = openQuizImport;
   $('#ad-quiz-export').onclick = exportQuizMD;
+
+  $('#ad-cleanup-now').onclick = async () => {
+    const btn = $('#ad-cleanup-now');
+    btn.disabled = true;
+    btn.textContent = '🔄 清理中...';
+    const result = await cleanupOldPhotos();
+    if (result.error) {
+      showToast('清理失敗：' + result.error, 'error');
+    } else if (result.deleted === 0) {
+      showToast('✓ 沒有需要清理的舊照片');
+    } else {
+      showToast(`✓ 已清理 ${result.deleted} 筆舊打卡照片`);
+    }
+    btn.disabled = false;
+    btn.textContent = '🗑️ 立即清理舊打卡照片';
+    // 重新載入 config 更新顯示時間
+    await loadConfig();
+    const el = $('#ad-cleanup-status');
+    if (el) el.textContent = `上次清理：${state.config?.last_cleanup_at
+      ? new Date(state.config.last_cleanup_at).toLocaleString('zh-TW')
+      : '尚未清理'}`;
+  };
 }
 
 let allQuestions = [];
@@ -3999,6 +4109,7 @@ async function init() {
         clearTimeout(failsafe);
         state.page = 'home'; render();
         if (typeof showIOSInstallTip === 'function') showIOSInstallTip();
+        ensureCleanupFresh(); // 每天自動清理舊打卡照片
         return;
       }
     }
