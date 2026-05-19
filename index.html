@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Super Meng v1 -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8" />
@@ -23,37 +24,52 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Caveat:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Caveat:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 :root {
-  --dark: #1a1a2e;
-  --darker: #0f0f1e;
-  --orange: #ff7c2a;
-  --orange-glow: #ff9a5a;
-  --blue: #00b4d8;
-  --blue-glow: #5fdfff;
-  --pink: #ff3d9a;
-  --gold: #ffd166;
+  /* 輕快淺色 - Super Meng v2 */
+  --bg:        #F7F9FC;   /* 天空白底 */
+  --bg-soft:   #FFFFFF;   /* 純白卡片 */
+  --ink:       #2D3142;   /* 墨黑（柔字）*/
+  --ink-soft:  #6B7280;   /* 灰字 */
+  --border:    #E8ECF1;   /* 細邊框 */
+
+  --primary:   #FF6B6B;   /* 珊瑚紅（主色）*/
+  --primary-l: #FFE5E5;   /* 珊瑚紅淡底 */
+  --mint:      #4ECDC4;   /* 薄荷藍綠 */
+  --mint-l:    #E0F7F5;   /* 薄荷淡底 */
+  --sun:       #FFE66D;   /* 陽光黃 */
+  --sun-l:     #FFF8D6;   /* 陽光淡底 */
+
+  /* 兼容舊變數名 - 讓既有程式碼不必大改 */
+  --dark:        var(--bg-soft);
+  --darker:      var(--bg);
+  --orange:      var(--primary);
+  --orange-glow: #FF8E8E;
+  --blue:        var(--mint);
+  --blue-glow:   #7EE0D8;
+  --pink:        #FF8FB3;
+  --gold:        #FFC857;
 }
 * { -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; padding: 0;
   font-family: 'Noto Sans TC', system-ui, sans-serif;
-  background: var(--darker);
-  color: #fff;
+  background: var(--bg);
+  color: var(--ink);
   overflow-x: hidden;
 }
-.font-display { font-family: 'Bangers', 'Noto Sans TC', sans-serif; letter-spacing: 2px; }
+.font-display { font-family: 'Quicksand', 'Noto Sans TC', sans-serif; letter-spacing: 0.5px; font-weight: 700; }
 .font-handwrite { font-family: 'Caveat', 'Noto Sans TC', cursive; }
 
-/* Cyberpunk background pattern */
+/* 淺色柔和背景 — 水彩風漸層 */
 body::before {
   content: '';
   position: fixed; inset: 0;
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(255,124,42,0.08) 0%, transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(0,180,216,0.08) 0%, transparent 40%),
-    repeating-linear-gradient(45deg, transparent 0, transparent 40px, rgba(255,255,255,0.012) 40px, rgba(255,255,255,0.012) 41px);
+    radial-gradient(circle at 18% 22%, rgba(255,107,107,0.06) 0%, transparent 45%),
+    radial-gradient(circle at 82% 78%, rgba(78,205,196,0.07) 0%, transparent 45%),
+    radial-gradient(circle at 50% 110%, rgba(255,230,109,0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -63,8 +79,8 @@ body::before {
   position: fixed;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.05;
-  filter: drop-shadow(0 0 8px currentColor);
+  opacity: 0.14;
+  filter: drop-shadow(0 2px 4px rgba(45,49,66,0.08));
 }
 @keyframes floatY {
   0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
@@ -96,72 +112,75 @@ body::before {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--orange), var(--pink));
-  color: #fff; font-weight: 900; letter-spacing: 2px;
+  background: linear-gradient(135deg, var(--primary), #FF8FB3);
+  color: var(--ink); font-weight: 700; letter-spacing: 1px;
   padding: 14px 24px; border-radius: 999px;
-  border: 2px solid rgba(255,255,255,0.2);
-  box-shadow: 0 4px 20px rgba(255,124,42,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
-  cursor: pointer; transition: all 0.15s;
-  font-family: 'Noto Sans TC', sans-serif;
+  border: none;
+  box-shadow: 0 6px 18px rgba(255,107,107,0.35), 0 2px 4px rgba(0,0,0,0.04);
+  cursor: pointer; transition: all 0.18s;
+  font-family: 'Quicksand','Noto Sans TC', sans-serif;
 }
-.btn-primary:active { transform: scale(0.96); }
+.btn-primary:active { transform: scale(0.96); box-shadow: 0 3px 10px rgba(255,107,107,0.3); }
 
 .btn-cyber {
-  background: linear-gradient(135deg, var(--blue), #0066ff);
-  color: #fff; font-weight: 900;
-  padding: 12px 20px; border-radius: 12px;
-  border: 2px solid var(--blue-glow);
-  box-shadow: 0 0 20px rgba(0,180,216,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
-  cursor: pointer; transition: all 0.15s;
-  font-family: 'Noto Sans TC', sans-serif;
+  background: linear-gradient(135deg, var(--mint), #7EE0D8);
+  color: var(--ink); font-weight: 700;
+  padding: 12px 20px; border-radius: 14px;
+  border: none;
+  box-shadow: 0 4px 14px rgba(78,205,196,0.32);
+  cursor: pointer; transition: all 0.18s;
+  font-family: 'Quicksand','Noto Sans TC', sans-serif;
 }
 .btn-cyber:active { transform: scale(0.96); }
 
 .card-cyber {
-  background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(15,15,30,0.95));
-  border: 2px solid rgba(0,180,216,0.3);
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  background: var(--bg-soft);
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(45,49,66,0.06), 0 1px 3px rgba(45,49,66,0.04);
   padding: 16px;
   position: relative;
   overflow: hidden;
+  color: var(--ink);
 }
 .card-cyber::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--orange), var(--blue), transparent);
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--sun), var(--mint));
+  opacity: 0.85;
 }
 
 .card-orange {
-  background: linear-gradient(135deg, rgba(255,124,42,0.15), rgba(255,61,154,0.1));
-  border: 2px solid rgba(255,124,42,0.4);
-  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary-l), #FFF0EB);
+  border: 1.5px solid rgba(255,107,107,0.25);
+  border-radius: 18px;
   padding: 16px;
+  color: var(--ink);
 }
 
 .input-cyber {
-  background: rgba(0,0,0,0.4);
-  border: 2px solid rgba(0,180,216,0.4);
-  color: #fff;
-  border-radius: 12px;
+  background: var(--bg-soft);
+  border: 1.5px solid var(--border);
+  color: var(--ink);
+  border-radius: 14px;
   padding: 14px 16px;
   font-size: 16px;
   outline: none;
   width: 100%;
   font-family: inherit;
-  transition: border 0.2s;
+  transition: all 0.2s;
 }
-.input-cyber:focus { border-color: var(--orange); box-shadow: 0 0 12px rgba(255,124,42,0.3); }
-.input-cyber::placeholder { color: rgba(255,255,255,0.4); }
+.input-cyber:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(255,107,107,0.12); }
+.input-cyber::placeholder { color: var(--ink-soft); opacity: 0.55; }
 
-.glow-text { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
-.glow-orange { color: var(--orange); text-shadow: 0 0 12px var(--orange); }
-.glow-blue { color: var(--blue); text-shadow: 0 0 12px var(--blue); }
-.glow-gold { color: var(--gold); text-shadow: 0 0 12px var(--gold); }
+.glow-text { text-shadow: 0 1px 2px rgba(45,49,66,0.1); }
+.glow-orange { color: var(--primary); }
+.glow-blue { color: var(--mint); }
+.glow-gold { color: #E5A600; }
 
 /* Animations */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px var(--orange), 0 0 20px var(--orange); }
-  50% { box-shadow: 0 0 25px var(--orange), 0 0 50px var(--orange); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,107,0.5); }
+  50%      { box-shadow: 0 0 0 14px rgba(255,107,107,0); }
 }
 .pulse-glow { animation: pulse-glow 1.5s infinite; }
 
@@ -188,75 +207,77 @@ body::before {
 /* Bottom nav */
 .bottom-nav {
   position: sticky; bottom: 0;
-  background: linear-gradient(180deg, rgba(15,15,30,0.95), rgba(15,15,30,1));
-  border-top: 2px solid rgba(0,180,216,0.3);
+  background: rgba(255,255,255,0.92);
+  border-top: 1.5px solid var(--border);
   display: flex; justify-content: space-around;
   padding: 8px 0 12px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -2px 12px rgba(45,49,66,0.04);
   z-index: 50;
 }
 .nav-item {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 6px 10px;
   cursor: pointer;
-  color: rgba(255,255,255,0.5);
+  color: var(--ink-soft);
   font-size: 11px; font-weight: 700;
   transition: color 0.2s;
   background: none; border: none;
   font-family: inherit;
 }
-.nav-item.active { color: var(--orange); text-shadow: 0 0 8px var(--orange); }
+.nav-item.active { color: var(--primary); }
 .nav-item .icon { font-size: 22px; }
 
 /* Toast */
 .toast {
   position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-  background: linear-gradient(135deg, var(--dark), var(--darker));
-  border: 2px solid var(--orange);
-  color: #fff; padding: 12px 20px; border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1.5px solid var(--primary);
+  color: var(--ink); padding: 12px 20px; border-radius: 999px;
   z-index: 999; font-weight: 700;
-  box-shadow: 0 4px 20px rgba(255,124,42,0.4);
+  box-shadow: 0 6px 20px rgba(255,107,107,0.18), 0 2px 6px rgba(0,0,0,0.06);
   animation: slide-up 0.3s ease;
 }
-.toast.error { border-color: #ff3d3d; }
-.toast.success { border-color: #4caf50; }
+.toast.error { border-color: #FF6B6B; color: #C92A2A; }
+.toast.success { border-color: #4ECDC4; color: #1B7A75; }
 
 /* Avatar grid */
 .avatar-cell {
   width: 56px; height: 56px;
-  background: rgba(0,0,0,0.4);
-  border: 2px solid rgba(0,180,216,0.3);
-  border-radius: 12px;
+  background: var(--bg-soft);
+  border: 2px solid var(--border);
+  border-radius: 16px;
   display: flex; align-items: center; justify-content: center;
   font-size: 28px; cursor: pointer;
   transition: all 0.15s;
 }
 .avatar-cell.selected {
-  border-color: var(--orange); box-shadow: 0 0 16px var(--orange);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(255,107,107,0.18);
   transform: scale(1.08);
 }
 
 /* Quiz options */
 .quiz-opt {
   display: flex; align-items: center; gap: 12px;
-  background: rgba(0,0,0,0.4);
-  border: 2px solid rgba(0,180,216,0.3);
-  border-radius: 12px;
+  background: var(--bg-soft);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
   padding: 14px 16px;
   cursor: pointer; transition: all 0.2s;
   text-align: left; width: 100%;
-  color: #fff; font-family: inherit;
+  color: var(--ink); font-family: inherit;
   font-size: 15px;
 }
-.quiz-opt:hover { border-color: var(--blue); }
-.quiz-opt.correct { background: rgba(76,175,80,0.2); border-color: #4caf50; }
-.quiz-opt.wrong { background: rgba(255,61,61,0.2); border-color: #ff3d3d; }
+.quiz-opt:hover { border-color: var(--mint); background: var(--mint-l); }
+.quiz-opt.correct { background: var(--mint-l); border-color: #4ECDC4; color: #1B7A75; }
+.quiz-opt.wrong   { background: var(--primary-l); border-color: #FF6B6B; color: #B33A3A; }
 
 /* Badge cell — 圓形 */
 .badge-cell {
   aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.85) 100%);
-  border: 2px solid rgba(255,255,255,0.12);
+  background: var(--bg-soft);
+  border: 2px solid var(--border);
   border-radius: 50%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 1px; padding: 4px;
@@ -265,60 +286,60 @@ body::before {
   cursor: pointer;
 }
 .badge-cell.earned {
-  background: radial-gradient(circle, rgba(255,209,102,0.25) 0%, rgba(255,124,42,0.15) 100%);
-  border-color: var(--gold);
-  box-shadow: 0 0 14px rgba(255,209,102,0.5), inset 0 0 8px rgba(255,209,102,0.2);
+  background: radial-gradient(circle, var(--sun-l) 0%, #FFF0CC 100%);
+  border-color: #FFC857;
+  box-shadow: 0 4px 14px rgba(255,200,87,0.35), inset 0 0 8px rgba(255,209,102,0.2);
 }
 .badge-cell.today {
-  animation: pulse-glow 1.2s infinite;
-  border-color: var(--orange);
+  animation: pulse-glow 1.4s infinite;
+  border-color: var(--primary);
+  background: radial-gradient(circle, var(--primary-l) 0%, #FFF0EB 100%);
 }
 .badge-cell .day-num {
   position: absolute; top: 4px;
   font-size: 9px; font-weight: 900;
-  opacity: 0.55;
-  font-family: 'Bangers';
-  color: var(--gold);
+  opacity: 0.6;
+  font-family: 'Quicksand', sans-serif;
+  color: var(--ink-soft);
 }
 .badge-cell:active { transform: scale(0.92); }
 
 /* Progress bar */
 .bar-track {
-  background: rgba(0,0,0,0.5);
+  background: var(--bg);
   border-radius: 999px;
   overflow: hidden;
   height: 10px;
-  border: 1px solid rgba(0,180,216,0.3);
+  border: 1px solid var(--border);
 }
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--orange), var(--gold));
-  box-shadow: 0 0 12px var(--orange);
+  background: linear-gradient(90deg, var(--mint), var(--sun), var(--primary));
   transition: width 0.5s;
 }
 
 /* Tabs */
 .tab-row {
   display: flex; gap: 6px;
-  background: rgba(0,0,0,0.4);
+  background: var(--bg);
   padding: 4px;
   border-radius: 999px;
-  border: 1px solid rgba(0,180,216,0.3);
+  border: 1.5px solid var(--border);
 }
 .tab-btn {
   flex: 1; padding: 8px 12px; border-radius: 999px;
   border: none; cursor: pointer; font-family: inherit;
   font-size: 13px; font-weight: 700;
-  background: transparent; color: rgba(255,255,255,0.6);
+  background: transparent; color: var(--ink-soft);
   transition: all 0.2s;
 }
 .tab-btn.active {
-  background: linear-gradient(135deg, var(--orange), var(--pink));
-  color: #fff;
-  box-shadow: 0 0 12px rgba(255,124,42,0.5);
+  background: linear-gradient(135deg, var(--primary), #FF8FB3);
+  color: var(--ink);
+  box-shadow: 0 4px 12px rgba(255,107,107,0.35);
 }
 
-/* Loading */
+/* Loading - 奔跑人偶 */
 .spinner {
   width: 40px; height: 40px;
   border: 4px solid rgba(0,180,216,0.2);
@@ -327,6 +348,71 @@ body::before {
   animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 跑步人偶載入動畫 */
+.runner-loader {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  padding: 20px;
+}
+.runner-svg {
+  width: 84px; height: 110px;
+  animation: runner-bounce 0.5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 12px rgba(255,107,107,0.35));
+}
+.runner-svg .leg-front { animation: leg-swing-fwd 0.5s ease-in-out infinite; transform-origin: 26px 50px; }
+.runner-svg .leg-back  { animation: leg-swing-bwd 0.5s ease-in-out infinite; transform-origin: 34px 50px; }
+.runner-svg .arm-front { animation: arm-swing-fwd 0.5s ease-in-out infinite; transform-origin: 22px 26px; }
+.runner-svg .arm-back  { animation: arm-swing-bwd 0.5s ease-in-out infinite; transform-origin: 38px 26px; }
+
+@keyframes runner-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+@keyframes leg-swing-fwd {
+  0%, 100% { transform: rotate(-35deg); }
+  50%      { transform: rotate(35deg); }
+}
+@keyframes leg-swing-bwd {
+  0%, 100% { transform: rotate(35deg); }
+  50%      { transform: rotate(-35deg); }
+}
+@keyframes arm-swing-fwd {
+  0%, 100% { transform: rotate(25deg); }
+  50%      { transform: rotate(-30deg); }
+}
+@keyframes arm-swing-bwd {
+  0%, 100% { transform: rotate(-30deg); }
+  50%      { transform: rotate(25deg); }
+}
+
+.runner-track {
+  width: 140px; height: 6px;
+  background: linear-gradient(90deg, transparent, var(--border) 30%, var(--border) 70%, transparent);
+  border-radius: 3px;
+  position: relative; overflow: hidden;
+}
+.runner-track::before {
+  content: '';
+  position: absolute; top: 0; left: -30%;
+  width: 30%; height: 100%;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  animation: track-slide 1.5s linear infinite;
+}
+@keyframes track-slide {
+  to { transform: translateX(450%); }
+}
+
+.runner-label {
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700; color: var(--ink);
+  font-size: 14px; letter-spacing: 3px;
+}
+.runner-subtle {
+  font-size: 11px; color: var(--ink-soft);
+  letter-spacing: 1px;
+}
 
 /* 愛心光芒 */
 @keyframes heart-burst {
@@ -421,18 +507,48 @@ body::before {
 <!-- 槓鈴片 左下 -->
 <svg class="deco deco-drift" style="bottom:200px; left:50%; width:70px; color:#ffd166; --dur:9s; --delay:3s; --dx:8px; --dy:-18px; --rot:0deg;" viewBox="0 0 100 100" fill="currentColor">
   <circle cx="50" cy="50" r="40"/>
-  <circle cx="50" cy="50" r="10" fill="#1a1a2e"/>
+  <circle cx="50" cy="50" r="10" fill="#FFFFFF"/>
 </svg>
 
 <!-- 跑鞋 中右 -->
 <svg class="deco deco-float" style="top:560px; right:60%; width:80px; color:#60a5fa; --dur:7s; --delay:1.2s; --dy:-14px; --rot:5deg;" viewBox="0 0 120 60" fill="currentColor">
   <path d="M10 40 Q15 25 35 22 L60 18 Q80 18 95 28 L110 35 Q115 40 113 48 L113 52 Q113 56 108 56 L15 56 Q10 56 10 50 Z"/>
-  <path d="M30 30 L40 25 M45 28 L55 24 M60 26 L70 24" stroke="#1a1a2e" stroke-width="1.5" fill="none"/>
+  <path d="M30 30 L40 25 M45 28 L55 24 M60 26 L70 24" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
 </svg>
 
 <div id="app">
-  <div style="display:flex; align-items:center; justify-content:center; min-height:100vh;">
-    <div class="spinner"></div>
+  <div class="runner-loader" style="min-height:100vh;">
+    <svg class="runner-svg" viewBox="0 0 60 80">
+      <!-- 頭 -->
+      <circle cx="30" cy="12" r="9" fill="#FF6B6B"/>
+      <!-- 馬尾 / 髮型 -->
+      <ellipse cx="36" cy="9" rx="3" ry="6" fill="#2D3142" transform="rotate(20 36 9)"/>
+      <!-- 身體 -->
+      <rect x="22" y="20" width="16" height="28" rx="6" fill="#FF6B6B"/>
+      <!-- 衣服橫條 -->
+      <rect x="22" y="32" width="16" height="3" fill="#FFE66D" opacity="0.8"/>
+      <!-- 後腿 -->
+      <g class="leg-back" style="transform-origin: 35px 50px; transform-box: fill-box;">
+        <rect x="32" y="48" width="6" height="24" rx="3" fill="#FF6B6B"/>
+        <rect x="31" y="68" width="9" height="5" rx="2" fill="#4ECDC4"/>
+      </g>
+      <!-- 前腿 -->
+      <g class="leg-front" style="transform-origin: 25px 50px; transform-box: fill-box;">
+        <rect x="22" y="48" width="6" height="24" rx="3" fill="#FF6B6B"/>
+        <rect x="21" y="68" width="9" height="5" rx="2" fill="#4ECDC4"/>
+      </g>
+      <!-- 後手 -->
+      <g class="arm-back" style="transform-origin: 38px 24px; transform-box: fill-box;">
+        <rect x="36" y="22" width="5" height="20" rx="2.5" fill="#FF6B6B"/>
+      </g>
+      <!-- 前手 -->
+      <g class="arm-front" style="transform-origin: 20px 24px; transform-box: fill-box;">
+        <rect x="18" y="22" width="5" height="20" rx="2.5" fill="#FF6B6B"/>
+      </g>
+    </svg>
+    <div class="runner-track"></div>
+    <div class="runner-label">SUPER MENG</div>
+    <div class="runner-subtle">載入中...</div>
   </div>
 </div>
 
@@ -460,7 +576,40 @@ const state = {
   quizState: null, // { day, options, selected, answered, correct }
 };
 
-const AVATARS = ['💪','🏃','🥗','🔥','⚡','🌟','🦁','🎯'];
+// 8 個人物頭像：男女各 4，不同髮型/膚色
+const AVATARS = ['👨','👨‍🦱','👨‍🦰','👨‍🦳','👩','👩‍🦱','👩‍🦰','👩‍🦳'];
+
+// 戳一下的「情緒勒索」訊息池
+const POKE_MESSAGES = [
+  '快瘦下來吧！💪',
+  '加油，我相信你能做到！🔥',
+  '別偷懶啊～運動時間到了！🏃',
+  '今天打卡了嗎？👀',
+  '吃健康一點啦～🥗',
+  '我們都在看你能瘦多少！👁️',
+  '怎麼還是這體重啊？😏',
+  '為了夏天努力一下吧！☀️',
+];
+
+const NO_POKE_PHRASES = [
+  '今天還沒人戳你，可能大家都太忙了…',
+  '咦？今天好安靜，要不要主動戳一下朋友？',
+  '0 人戳你 — 可能是因為你太棒了，沒人需要督促你！⭐',
+  '今天平靜的一天，繼續努力！💪',
+];
+
+const FEW_POKE_PHRASES = (n) => [
+  `${n} 個人在關心你的進度，別讓他們失望喔！`,
+  `今天 ${n} 個人戳你，這是溫柔的提醒～`,
+  `來自 ${n} 位朋友的關注，加油💪`,
+];
+
+const MANY_POKE_PHRASES = (n) => [
+  `哇！${n} 個人在關心你！是時候動起來了 🔥`,
+  `${n} 個朋友期待看到你瘦下來，加油！`,
+  `${n} 戳！大家都很關心你，今天一定要打卡 ⚡`,
+  `${n} 人在催促你，今天要不要直接跑兩圈？🏃`,
+];
 const BADGE_NAMES = [
   ['啟程鬥士','🚀'],['晨光勇者','🌅'],['三日堅持','💎'],['飲食達人','🥗'],
   ['知識探索','📚'],['六日燃燒','🔥'],['一週英雄','🦁'],['穩健前行','⚓'],
@@ -719,6 +868,7 @@ async function loadUserData() {
   state.mealCheckins = meals.data || [];
   state.badges = badges.data || [];
   state.myLikesGiven = myLikesGiven.data || [];
+  await loadFriends();
   checkBadgeEligibility();
 }
 
@@ -792,6 +942,173 @@ async function togglePin(checkinId, currentlyPinned) {
 let _lastHeartCount = null;
 let _heartPollTimer = null;
 
+async function renderFriendsGrid() {
+  const grid = document.getElementById('friends-grid');
+  if (!grid) return;
+  const friends = state.friends || [];
+  const slots = [];
+  for (let i = 0; i < 3; i++) {
+    const f = friends[i];
+    if (f) {
+      slots.push(`
+        <div style="background:var(--bg-soft); border:2px solid var(--border); border-radius:14px; padding:10px 6px; text-align:center; position:relative;">
+          <div style="position:absolute; top:4px; right:6px; cursor:pointer; opacity:0.5; font-size:11px;" data-remove-friend="${f.id}">✕</div>
+          <div style="font-size:32px;">${f.avatar}</div>
+          <div style="font-size:11px; font-weight:700; color:var(--ink); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.name}</div>
+          <div style="font-size:9px; color:var(--ink-soft);">Lv ${f.level}</div>
+          <button data-poke-friend="${f.id}" data-poke-name="${f.name}" style="
+            margin-top:6px; padding:4px 10px; border-radius:999px; border:none;
+            background:linear-gradient(135deg, var(--primary), #FF8FB3); color:#fff;
+            font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;
+            box-shadow:0 2px 6px rgba(255,107,107,0.3);
+          ">👉 戳一下</button>
+        </div>`);
+    } else {
+      slots.push(`
+        <button class="add-friend-slot" style="
+          background:var(--bg); border:2px dashed var(--border); border-radius:14px;
+          padding:14px 6px; text-align:center; cursor:pointer; color:var(--ink-soft);
+          font-family:inherit; font-size:11px; display:flex; flex-direction:column;
+          align-items:center; justify-content:center; gap:4px; min-height:100px;
+          transition: all 0.2s;
+        " data-add-slot="${i}">
+          <div style="font-size:24px;">➕</div>
+          <div>加好友</div>
+        </button>`);
+    }
+  }
+  grid.innerHTML = slots.join('');
+
+  // 綁定事件
+  grid.querySelectorAll('[data-add-slot]').forEach(el => {
+    el.onclick = () => openAddFriendModal();
+  });
+  grid.querySelectorAll('[data-remove-friend]').forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('移除此好友？')) return;
+      await removeFriend(el.dataset.removeFriend);
+      renderFriendsGrid();
+    };
+  });
+  grid.querySelectorAll('[data-poke-friend]').forEach(el => {
+    el.onclick = () => openPokeModal(el.dataset.pokeFriend, el.dataset.pokeName);
+  });
+}
+
+function openAddFriendModal() {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position:fixed; inset:0; z-index:999;
+    background:rgba(45,49,66,0.4); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--bg-soft); border-radius:20px; padding:24px; max-width:340px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.18);">
+      <div class="font-display glow-orange" style="font-size:22px; margin-bottom:6px;">➕ 加好友</div>
+      <div style="font-size:12px; color:var(--ink-soft); margin-bottom:14px;">輸入對方的手機號碼即可加為好友</div>
+      <input id="friend-phone-input" class="input-cyber" type="tel" placeholder="09xxxxxxxx" />
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button id="friend-cancel" class="btn-cyber" style="flex:1; background:var(--bg); color:var(--ink-soft); border:1.5px solid var(--border); box-shadow:none;">取消</button>
+        <button id="friend-add" class="btn-primary" style="flex:1;">加入好友</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#friend-phone-input').focus();
+  modal.querySelector('#friend-cancel').onclick = () => modal.remove();
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.querySelector('#friend-add').onclick = async () => {
+    const phone = modal.querySelector('#friend-phone-input').value.trim();
+    try {
+      const friend = await addFriendByPhone(phone);
+      showToast(`✓ 已加入 ${friend.name}！+5 XP`);
+      modal.remove();
+      render(); // 重畫整個主頁
+    } catch (e) {
+      showToast(e.message || '加好友失敗', 'error');
+    }
+  };
+}
+
+function openPokeModal(friendId, friendName) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position:fixed; inset:0; z-index:999;
+    background:rgba(45,49,66,0.4); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  `;
+  modal.innerHTML = `
+    <div style="background:var(--bg-soft); border-radius:20px; padding:24px; max-width:340px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,0.18); position:relative;">
+      <div style="text-align:center; font-size:48px; animation: badge-rotate 1.5s ease-in-out;">👉</div>
+      <div class="font-display glow-orange" style="font-size:22px; text-align:center; margin-top:4px;">戳一下 ${friendName}</div>
+      <div style="font-size:12px; color:var(--ink-soft); text-align:center; margin-top:6px;">選一句話送給 TA（+3 XP）</div>
+
+      <div id="poke-msg-list" style="display:flex; flex-direction:column; gap:6px; margin-top:14px; max-height:280px; overflow-y:auto;">
+        ${POKE_MESSAGES.map(m => `<button class="quiz-opt" data-poke-msg="${m}" style="padding:10px 12px; font-size:13px;">${m}</button>`).join('')}
+      </div>
+
+      <button id="poke-cancel" style="
+        margin-top:14px; width:100%; padding:10px;
+        background:var(--bg); border:1.5px solid var(--border); border-radius:999px;
+        color:var(--ink-soft); font-family:inherit; font-weight:700; cursor:pointer;
+      ">取消</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#poke-cancel').onclick = () => modal.remove();
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.querySelectorAll('[data-poke-msg]').forEach(btn => {
+    btn.onclick = async () => {
+      const msg = btn.dataset.pokeMsg;
+      try {
+        await pokeFriend(friendId, msg);
+        showToast(`✓ 已戳 ${friendName}！+3 XP`);
+        modal.remove();
+      } catch (e) {
+        showToast(e.message || '戳失敗', 'error');
+      }
+    };
+  });
+}
+
+async function renderPokesCard() {
+  const wrap = document.getElementById('pokes-card');
+  if (!wrap) return;
+  const pokes = await loadPokesReceivedToday();
+  const n = pokes.length;
+
+  let phrase, accent, icon;
+  if (n === 0) {
+    phrase = NO_POKE_PHRASES[Math.floor(Math.random()*NO_POKE_PHRASES.length)];
+    accent = 'var(--mint)'; icon = '🤔';
+  } else if (n < 3) {
+    phrase = FEW_POKE_PHRASES(n)[Math.floor(Math.random()*3)];
+    accent = 'var(--sun)'; icon = '👉';
+  } else {
+    phrase = MANY_POKE_PHRASES(n)[Math.floor(Math.random()*4)];
+    accent = 'var(--primary)'; icon = '🔥';
+  }
+
+  wrap.innerHTML = `
+    <div style="
+      background:linear-gradient(135deg, ${n>=3?'var(--primary-l)':n>0?'var(--sun-l)':'var(--mint-l)'}, var(--bg-soft));
+      border:2px solid ${accent};
+      border-radius:18px; padding:14px 16px;
+      box-shadow:0 4px 16px rgba(45,49,66,0.06);
+    ">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="font-size:36px;">${icon}</div>
+        <div style="flex:1;">
+          <div style="font-size:11px; color:${accent}; font-weight:900; letter-spacing:1px;">今日被戳</div>
+          <div class="font-display" style="font-size:32px; line-height:1; color:var(--ink);">${n} <span style="font-size:14px;">次</span></div>
+        </div>
+      </div>
+      <div style="margin-top:8px; font-size:13px; line-height:1.5; color:var(--ink);">${phrase}</div>
+    </div>
+  `;
+}
+
 async function updateHomeHearts() {
   const numEl = document.getElementById('heart-count-num');
   const iconEl = document.getElementById('heart-icon');
@@ -843,6 +1160,69 @@ function playHeartBurst(iconEl) {
   if (audioCtx) tone(880 + Math.random()*200, 0.12, 'sine', 0.1);
 }
 
+// ============ 好友 / 戳一下 ============
+async function loadFriends() {
+  if (!state.user) return [];
+  const { data: links } = await sb.from('smr_friendships')
+    .select('friend_id').eq('user_id', state.user.id);
+  if (!links?.length) { state.friends = []; return []; }
+  const ids = links.map(l => l.friend_id);
+  const { data: users } = await sb.from('smr_users')
+    .select('id, name, phone, avatar, level, xp').in('id', ids);
+  state.friends = users || [];
+  return state.friends;
+}
+
+async function addFriendByPhone(phone) {
+  phone = (phone || '').trim();
+  if (!phone) throw new Error('請輸入手機號碼');
+  if (phone === state.user.phone) throw new Error('不能加自己為好友');
+  const { data: target } = await sb.from('smr_users')
+    .select('id, name, phone').eq('phone', phone).maybeSingle();
+  if (!target) throw new Error('找不到此手機號碼的玩家');
+
+  // 檢查是否已加
+  const exists = state.friends?.find(f => f.id === target.id);
+  if (exists) throw new Error(`${target.name} 已是好友`);
+
+  const { error } = await sb.from('smr_friendships').insert({
+    user_id: state.user.id, friend_id: target.id
+  });
+  if (error) throw new Error('加好友失敗：' + error.message);
+
+  await loadFriends();
+  await addXP(5);
+  return target;
+}
+
+async function removeFriend(friendId) {
+  await sb.from('smr_friendships').delete()
+    .eq('user_id', state.user.id).eq('friend_id', friendId);
+  await loadFriends();
+}
+
+async function pokeFriend(friendId, message) {
+  const { error } = await sb.from('smr_pokes').insert({
+    poker_id: state.user.id, poked_id: friendId,
+    message: message || POKE_MESSAGES[Math.floor(Math.random()*POKE_MESSAGES.length)],
+    poke_date: today(),
+  });
+  if (error) {
+    if (error.code === '23505') throw new Error('今天已戳過此人囉～');
+    throw new Error('戳失敗：' + error.message);
+  }
+  sfx.checkin();
+  await addXP(3);
+}
+
+async function loadPokesReceivedToday() {
+  if (!state.user) return [];
+  const { data } = await sb.from('smr_pokes')
+    .select('*').eq('poked_id', state.user.id).eq('poke_date', today())
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
 async function loadMyHeartsToday() {
   // 今天我的照片收到幾個愛心
   const day = today();
@@ -884,11 +1264,17 @@ async function loginUser(phone) {
   await loadTodayQuiz();
   return u;
 }
-async function registerUser(phone, name, password, avatar, birthdate, gender) {
+async function registerUser(phone, name, password, avatar, birthdate, gender, weightPhotoUrl) {
   if (password !== state.config.registration_password) {
     throw new Error('報名密碼錯誤');
   }
-  const { data, error } = await sb.from('smr_users').insert({ phone, name, avatar, birthdate, gender }).select().single();
+  if (!weightPhotoUrl) {
+    throw new Error('請上傳開賽前體重秤照片');
+  }
+  const { data, error } = await sb.from('smr_users').insert({
+    phone, name, avatar, birthdate, gender,
+    start_weight_photo_url: weightPhotoUrl
+  }).select().single();
   if (error) throw error;
   state.user = data;
   localStorage.setItem('smr_phone', phone);
@@ -1146,7 +1532,7 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
         const wait = baseDelay + jitter;
         setAIStatus(`<div style="text-align:center;">
           <div style="font-size:14px; color:var(--orange);">⏳ 系統繁忙，自動重試中...</div>
-          <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:4px;">第 ${attempt}/${MAX_ATTEMPTS} 次嘗試 · 等待 ${Math.round(wait/1000)} 秒</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:4px;">第 ${attempt}/${MAX_ATTEMPTS} 次嘗試 · 等待 ${Math.round(wait/1000)} 秒</div>
         </div>`);
         await new Promise(r => setTimeout(r, wait));
         continue;
@@ -1322,7 +1708,7 @@ function showQueueOverlay() {
   overlay.id = 'ai-overlay';
   overlay.style.cssText = `
     position:fixed; inset:0; z-index:998;
-    background: radial-gradient(ellipse at center, #1a1a4a 0%, #0a0a1e 70%);
+    background: radial-gradient(ellipse at center, #FFF8F5 0%, #F7F9FC 60%, #E0F7F5 100%);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     padding:20px; overflow:hidden;
   `;
@@ -1353,34 +1739,35 @@ function showQueueOverlay() {
         position: absolute;
         width: 240px; height: 240px;
         border-radius: 50%;
-        background: conic-gradient(from 0deg, transparent, #ff7c2a, #00b4d8, #ff3d9a, transparent, transparent);
-        filter: blur(20px);
+        background: conic-gradient(from 0deg, transparent, #FF6B6B, #4ECDC4, #FFE66D, transparent, transparent);
+        filter: blur(28px);
         animation: portal-spin 6s linear infinite;
-        opacity: 0.6;
+        opacity: 0.45;
       }
       .portal-ring {
         position: relative;
         width: 160px; height: 160px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(0,180,216,0.3) 0%, rgba(255,124,42,0.2) 60%, transparent 100%);
-        border: 3px solid rgba(255,124,42,0.6);
-        box-shadow: 0 0 60px #ff7c2a, inset 0 0 30px #00b4d8;
+        background: radial-gradient(circle, rgba(255,107,107,0.18) 0%, rgba(78,205,196,0.15) 60%, transparent 100%);
+        border: 3px solid rgba(255,107,107,0.55);
+        box-shadow: 0 0 40px rgba(255,107,107,0.35), inset 0 0 24px rgba(78,205,196,0.25);
         animation: portal-pulse 2s ease-in-out infinite;
         display: flex; align-items: center; justify-content: center;
       }
       .portal-core {
         width: 80px; height: 80px;
         border-radius: 50%;
-        background: radial-gradient(circle, #fff 0%, #00b4d8 30%, #1a1a4a 80%);
+        background: radial-gradient(circle, #FFFFFF 0%, #FFE66D 40%, #4ECDC4 90%);
         animation: portal-spin 3s linear infinite;
-        box-shadow: 0 0 40px #00b4d8;
+        box-shadow: 0 0 28px rgba(255,230,109,0.5);
       }
       .star {
         position: absolute;
-        width: 3px; height: 3px;
-        background: #fff;
+        width: 4px; height: 4px;
+        background: #FFC857;
         border-radius: 50%;
         animation: star-twinkle 2s infinite;
+        box-shadow: 0 0 4px rgba(255,200,87,0.6);
       }
     </style>
 
@@ -1414,7 +1801,7 @@ function showQueueOverlay() {
     <!-- 狀態資訊 -->
     <div id="queue-info" style="margin-top:16px; text-align:center; z-index:2; min-height:80px;">
       <div class="font-display glow-blue" style="font-size:22px;">CONNECTING...</div>
-      <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:6px;">準備加入排隊</div>
+      <div style="font-size:12px; color:var(--ink-soft); margin-top:6px;">準備加入排隊</div>
     </div>
 
     <div id="ai-status" style="display:none;"></div>
@@ -1457,7 +1844,7 @@ function updateQueueUI(myPos, processing) {
 
   info.innerHTML = `
     <div class="font-display glow-orange" style="font-size:28px;">${icon} ${msg}</div>
-    <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-top:4px;">${sub}</div>
+    <div style="font-size:13px; color:var(--ink); margin-top:4px;">${sub}</div>
     <div style="font-size:11px; color:var(--blue); margin-top:6px;">⚡ 系統處理中：${processing} 人</div>
   `;
 }
@@ -1491,7 +1878,7 @@ function transitionToProcessing() {
   setTimeout(() => {
     info.innerHTML = `
       <div class="font-display glow-orange" style="font-size:28px;">🔬 ANALYZING</div>
-      <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-top:4px;">AI 正在掃描中...</div>
+      <div style="font-size:13px; color:var(--ink); margin-top:4px;">AI 正在掃描中...</div>
       <div id="ai-status" style="margin-top:8px; min-height:40px;"></div>
     `;
   }, 1400);
@@ -1581,7 +1968,7 @@ const pages = {
         SUPER MENG
       </h1>
       <div class="font-handwrite glow-blue" style="font-size:22px; margin-top:-4px;">超艋無差別減脂大賽</div>
-      <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">DAY ${day} / 28 · 比賽進行中</div>
+      <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">DAY ${day} / 28 · 比賽進行中</div>
     </div>
 
     <div class="card-cyber mx-4 mt-2">
@@ -1592,7 +1979,7 @@ const pages = {
             <span class="font-display glow-orange" style="font-size:20px;">Lv ${lv}</span>
             <span style="font-weight:700; font-size:16px;">${state.user.name}</span>
           </div>
-          <div style="font-size:12px; color:rgba(255,255,255,0.6);">${xp} XP / ${nextLv}</div>
+          <div style="font-size:12px; color:var(--ink-soft);">${xp} XP / ${nextLv}</div>
           <div class="bar-track mt-1"><div class="bar-fill" style="width:${xpPct}%"></div></div>
         </div>
       </div>
@@ -1601,26 +1988,38 @@ const pages = {
     <div class="grid grid-cols-4 gap-2 px-4 mt-3">
       <div class="card-cyber" style="text-align:center; padding:12px 4px;">
         <div class="glow-orange font-display" style="font-size:20px;">${fatLost}%</div>
-        <div style="font-size:10px; color:rgba(255,255,255,0.6);">體脂↓</div>
+        <div style="font-size:10px; color:var(--ink-soft);">體脂↓</div>
       </div>
       <div class="card-cyber" style="text-align:center; padding:12px 4px;">
         <div class="glow-blue font-display" style="font-size:20px;">${checkinDays}</div>
-        <div style="font-size:10px; color:rgba(255,255,255,0.6);">打卡天</div>
+        <div style="font-size:10px; color:var(--ink-soft);">打卡天</div>
       </div>
       <div class="card-cyber" style="text-align:center; padding:12px 4px;">
         <div class="glow-gold font-display" style="font-size:20px;">${state.badges.length}</div>
-        <div style="font-size:10px; color:rgba(255,255,255,0.6);">勳章</div>
+        <div style="font-size:10px; color:var(--ink-soft);">勳章</div>
       </div>
       <div class="card-cyber heart-card" style="text-align:center; padding:12px 4px; position:relative; overflow:visible; cursor:pointer;" id="heart-card">
         <div style="font-size:20px; line-height:1; position:relative; display:inline-block;" id="heart-icon">❤️</div>
         <div id="heart-count-num" style="font-size:14px; font-weight:900; color:var(--pink); text-shadow:0 0 8px var(--pink);">0</div>
-        <div style="font-size:10px; color:rgba(255,255,255,0.6);">收到愛心</div>
+        <div style="font-size:10px; color:var(--ink-soft);">收到愛心</div>
       </div>
     </div>
 
     <div class="card-orange mx-4 mt-3" style="padding:12px 16px;">
       <div style="font-size:11px; color:var(--orange); font-weight:700;">🌍 全隊減碳</div>
-      <div class="font-display" style="font-size:24px; color:#fff;">~${(checkinDays * 2.5).toFixed(1)} kg CO₂</div>
+      <div class="font-display" style="font-size:24px; color:var(--ink);">~${(checkinDays * 2.5).toFixed(1)} kg CO₂</div>
+    </div>
+
+    <!-- 戳一下：今日被戳次數 -->
+    <div id="pokes-card" class="px-4 mt-3"></div>
+
+    <!-- 好友 3 格 -->
+    <div class="px-4 mt-3">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div class="font-display glow-blue" style="font-size:16px;">👥 我的好友</div>
+        <div style="font-size:11px; color:var(--ink-soft);">${(state.friends||[]).length} 位好友</div>
+      </div>
+      <div id="friends-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>
     </div>
 
     <div class="px-4 mt-4">
@@ -1630,7 +2029,7 @@ const pages = {
         <div class="flex items-center justify-between">
           <div>
             <div style="font-weight:700;">📝 每日知識測驗</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:2px;">+20 XP（答對）</div>
+            <div style="font-size:11px; color:var(--ink-soft); margin-top:2px;">+20 XP（答對）</div>
           </div>
           <div style="font-size:20px;">${todayQuizDone ? '✅' : '▶'}</div>
         </div>
@@ -1649,7 +2048,7 @@ const pages = {
         }
         return `<div class="card-cyber">
           <div style="font-weight:700; margin-bottom:8px;">☀️ 運動或健康餐打卡（每日一次）</div>
-          <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-bottom:10px;">📸 上傳今日午餐照片即可打卡</div>
+          <div style="font-size:11px; color:var(--ink-soft); margin-bottom:10px;">📸 上傳今日午餐照片即可打卡</div>
           <input type="file" id="lunch-photo" accept="image/*" capture="environment" style="display:none;" />
           <button class="btn-cyber" id="lunch-upload-btn" style="width:100%;">📷 拍照 / 選擇照片</button>
           <div id="lunch-preview" style="margin-top:10px;"></div>
@@ -1663,11 +2062,11 @@ const pages = {
       ` : ''}
 
       <!-- 登出按鈕 -->
-      <div style="margin-top:32px; padding-top:20px; border-top:1px dashed rgba(255,255,255,0.1); text-align:center;">
-        <div style="font-size:11px; color:rgba(255,255,255,0.4); margin-bottom:10px;">登入身分：${state.user.name} (${state.user.phone})</div>
+      <div style="margin-top:32px; padding-top:20px; border-top:1px dashed var(--border); text-align:center;">
+        <div style="font-size:11px; color:var(--ink-soft); margin-bottom:10px;">登入身分：${state.user.name} (${state.user.phone})</div>
         <button id="logout-btn" style="
-          background:transparent; border:1.5px solid rgba(255,255,255,0.3);
-          color:rgba(255,255,255,0.7); padding:10px 24px; border-radius:24px;
+          background:transparent; border:1.5px solid rgba(45,49,66,0.20);
+          color:var(--ink); padding:10px 24px; border-radius:24px;
           font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
           transition: all 0.2s;
         ">🚪 登出帳號</button>
@@ -1681,7 +2080,7 @@ const pages = {
     return `
     <div style="padding:20px 16px 8px;">
       <h1 class="font-display glow-orange" style="font-size:28px;">RANKING</h1>
-      <div class="font-handwrite glow-blue" style="font-size:18px;">即時排行榜</div>
+      <div class="font-handwrite glow-blue" style="font-size:18px;">每日凌晨刷新</div>
     </div>
     <div class="px-4 mt-2">
       <div class="tab-row">
@@ -1757,7 +2156,7 @@ const pages = {
         <div class="font-handwrite glow-blue" style="font-size:18px;">今日已記錄 ✓</div>
       </div>
       <div class="card-orange mx-4 mt-2 pulse-glow">
-        <div style="font-weight:900; color:#fff; font-size:16px;">🔬 AI 完整分析（限用一次）</div>
+        <div style="font-weight:900; color:var(--ink); font-size:16px;">🔬 AI 完整分析（限用一次）</div>
         <div style="font-size:12px; opacity:0.9; margin-top:4px;">面診 + 舌診 + 體質判定 + 中醫養生建議</div>
         <button class="btn-primary" data-nav-ai="1" style="width:100%; margin-top:10px;">立即使用 AI 分析</button>
       </div>
@@ -1807,7 +2206,7 @@ const pages = {
                   <div id="tongue-preview"></div>
                 </div>
               </div>
-              <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:8px;">⚠️ 兩張照片皆上傳才能進行 AI 分析；只填數據可跳過。</div>
+              <div style="font-size:11px; color:var(--ink-soft); margin-top:8px;">⚠️ 兩張照片皆上傳才能進行 AI 分析；只填數據可跳過。</div>
             </div>
           ` : ''}
 
@@ -1844,7 +2243,7 @@ const pages = {
     <div style="padding:20px 16px;">
       <h1 class="font-display glow-orange" style="font-size:28px;">PHOTO WALL</h1>
       <div class="font-handwrite glow-blue" style="font-size:18px;">今日拍照牆 · ${today()}</div>
-      <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">💖 為夥伴加油 · 📌 置頂收藏</div>
+      <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">💖 為夥伴加油 · 📌 置頂收藏</div>
     </div>
     <div id="photowall-content" class="px-4 mt-2">
       <div style="display:flex; justify-content:center; padding:40px;"><div class="spinner"></div></div>
@@ -1873,7 +2272,7 @@ const pages = {
           data-badge-day="${dayNum}" data-badge-status="${status}" data-badge-name="${name}">
           <div class="day-num">${dayNum}</div>
           <div style="font-size:22px; margin-top:6px; ${earned?'':'filter:grayscale(1); opacity:0.35;'}">${emoji}</div>
-          <div style="font-size:8px; text-align:center; line-height:1.1; ${earned?'color:var(--gold)':'color:rgba(255,255,255,0.4)'}">${name}</div>
+          <div style="font-size:8px; text-align:center; line-height:1.1; ${earned?'color:var(--gold)':'color:var(--ink-soft)'}">${name}</div>
         </div>`;
       }).join('')}
     </div>
@@ -1881,7 +2280,7 @@ const pages = {
   },
 
   quiz: () => {
-    if (!state.todayQuiz) return `<div style="padding:40px; text-align:center; color:rgba(255,255,255,0.6);">今日尚無題目</div>`;
+    if (!state.todayQuiz) return `<div style="padding:40px; text-align:center; color:var(--ink-soft);">今日尚無題目</div>`;
     const q = state.todayQuiz;
     const opts = [q.option_a, q.option_b, q.option_c, q.option_d];
     const done = state.quizRecords.find(r => r.quiz_day === q.day_number);
@@ -1940,20 +2339,20 @@ function aiReportCard(rep) {
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:12px;">
-      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px;">
-        <div style="font-size:10px; color:rgba(255,255,255,0.5);">體重</div>
+      <div style="background:var(--bg); padding:8px 10px; border-radius:8px;">
+        <div style="font-size:10px; color:var(--ink-soft);">體重</div>
         <div class="font-display glow-blue" style="font-size:20px;">${bc.weight || '—'} <span style="font-size:11px;">kg</span></div>
       </div>
-      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.bodyFatStatus)};">
-        <div style="font-size:10px; color:rgba(255,255,255,0.5);">體脂率 ${bc.bodyFatStatus || ''}</div>
+      <div style="background:var(--bg); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.bodyFatStatus)};">
+        <div style="font-size:10px; color:var(--ink-soft);">體脂率 ${bc.bodyFatStatus || ''}</div>
         <div class="font-display" style="font-size:20px; color:${valColor(bc.bodyFatStatus)};">${bc.bodyFat || '—'} <span style="font-size:11px;">%</span></div>
       </div>
-      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.muscleStatus)};">
-        <div style="font-size:10px; color:rgba(255,255,255,0.5);">肌肉量 ${bc.muscleStatus || ''}</div>
+      <div style="background:var(--bg); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.muscleStatus)};">
+        <div style="font-size:10px; color:var(--ink-soft);">肌肉量 ${bc.muscleStatus || ''}</div>
         <div class="font-display" style="font-size:20px; color:${valColor(bc.muscleStatus)};">${bc.muscle || '—'} <span style="font-size:11px;">kg</span></div>
       </div>
-      <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.visceralStatus)};">
-        <div style="font-size:10px; color:rgba(255,255,255,0.5);">內臟脂肪 ${bc.visceralStatus || ''}</div>
+      <div style="background:var(--bg); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.visceralStatus)};">
+        <div style="font-size:10px; color:var(--ink-soft);">內臟脂肪 ${bc.visceralStatus || ''}</div>
         <div class="font-display" style="font-size:20px; color:${valColor(bc.visceralStatus)};">Lv ${bc.visceral || '—'}</div>
       </div>
     </div>
@@ -1963,13 +2362,13 @@ function aiReportCard(rep) {
         <span style="font-size:24px;">${organEmoji[bc.organConcern] || '⚕️'}</span>
         <div>
           <div style="font-size:11px; color:var(--orange); font-weight:700;">⚠️ 重點關注</div>
-          <div class="font-display" style="font-size:18px; color:#fff;">${bc.organConcern || '—'}</div>
+          <div class="font-display" style="font-size:18px; color:var(--ink);">${bc.organConcern || '—'}</div>
         </div>
       </div>
       <div style="font-size:12px; line-height:1.5; margin-top:6px; opacity:0.9;">${bc.concernReason || ''}</div>
     </div>
 
-    <div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px; font-size:12px; line-height:1.6;">
+    <div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.6;">
       <b style="color:var(--blue);">🏷️ 體型分類：</b>${bc.type || '—'}<br>
       <span style="opacity:0.85;">${bc.summary || ''}</span>
     </div>
@@ -1983,23 +2382,23 @@ function aiReportCard(rep) {
       <div class="font-display glow-gold" style="font-size:18px;">${oa.concernOrgan} 養生建議</div>
     </div>
 
-    <div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+    <div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:8px;">
       <div style="font-size:11px; color:#ffd166; font-weight:700; margin-bottom:4px;">📜 黃帝內經</div>
       <div style="font-size:13px; line-height:1.5;">${oa.tcmTheory || ''}</div>
     </div>
 
-    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+    <div style="margin-top:8px; padding:10px; background:var(--bg); border-radius:8px;">
       <div style="font-size:11px; color:var(--blue); font-weight:700; margin-bottom:4px;">🧪 戴維斯營養觀</div>
       <div style="font-size:13px; line-height:1.5;">${oa.nutrition || ''}</div>
     </div>
 
-    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+    <div style="margin-top:8px; padding:10px; background:var(--bg); border-radius:8px;">
       <div style="font-size:11px; color:#4caf50; font-weight:700; margin-bottom:4px;">🏃 運動建議</div>
       <div style="font-size:13px; line-height:1.5;">${oa.exercise || ''}</div>
     </div>
 
     ${oa.research?.length ? `
-    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:8px;">
+    <div style="margin-top:8px; padding:10px; background:var(--bg); border-radius:8px;">
       <div style="font-size:11px; color:var(--pink); font-weight:700; margin-bottom:4px;">📚 相關研究</div>
       <ul style="padding-left:18px; font-size:12px; line-height:1.6;">
         ${oa.research.map(r => {
@@ -2021,13 +2420,13 @@ function aiReportCard(rep) {
       <span style="font-size:24px;">🔬</span>
       <div class="font-display glow-orange" style="font-size:20px;">AI 中醫完整分析</div>
     </div>
-    <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:2px;">面診 + 舌診 + 體質判定</div>
+    <div style="font-size:11px; color:var(--ink-soft); margin-top:2px;">面診 + 舌診 + 體質判定</div>
 
     <div style="margin-top:14px; padding:12px; background:rgba(255,124,42,0.1); border-radius:10px; border:1px solid rgba(255,124,42,0.3);">
       <div style="font-size:11px; color:var(--orange); font-weight:700;">🏷️ 體質類型</div>
-      <div class="font-display" style="font-size:24px; color:#fff; margin-top:2px;">${rep.constitution?.type || '—'}</div>
+      <div class="font-display" style="font-size:24px; color:var(--ink); margin-top:2px;">${rep.constitution?.type || '—'}</div>
       <div style="font-size:13px; line-height:1.5; opacity:0.9; margin-top:4px;">${rep.constitution?.description || ''}</div>
-      <div style="font-size:12px; line-height:1.5; opacity:0.7; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.15);">
+      <div style="font-size:12px; line-height:1.5; opacity:0.7; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(45,49,66,0.10);">
         <b>面舌互證：</b>${rep.constitution?.crossVerify || ''}
       </div>
     </div>
@@ -2037,7 +2436,7 @@ function aiReportCard(rep) {
     <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">👤 面部六區分析</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
       ${(rep.faceZones || []).map(z => `
-        <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px; border-left:3px solid ${statusColor(z.status)};">
+        <div style="background:var(--bg); padding:8px 10px; border-radius:8px; border-left:3px solid ${statusColor(z.status)};">
           <div style="font-weight:700; font-size:13px;">${z.zone}</div>
           <div style="font-size:11px; color:${statusColor(z.status)}; font-weight:700; margin-top:2px;">${z.status}</div>
           <div style="font-size:11px; opacity:0.7; margin-top:2px; line-height:1.3;">${z.organ || ''}</div>
@@ -2050,7 +2449,7 @@ function aiReportCard(rep) {
     <div style="font-weight:700; color:var(--blue); margin-bottom:8px;">👅 舌診五項</div>
     <div style="display:flex; flex-direction:column; gap:6px;">
       ${(rep.tongueAnalysis || []).map(t => `
-        <div style="background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:8px;">
+        <div style="background:var(--bg); padding:8px 10px; border-radius:8px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-weight:700; font-size:13px;">${t.item}</span>
             <span style="font-size:11px; color:var(--orange);">${t.observation}</span>
@@ -2066,20 +2465,20 @@ function aiReportCard(rep) {
     ${(rep.nutrients || []).map(n => {
       const url = getNutrientLink(n.name);
       return `
-      <div style="background:rgba(0,0,0,0.4); padding:10px 12px; border-radius:8px; margin-bottom:6px;">
+      <div style="background:var(--bg); padding:10px 12px; border-radius:8px; margin-bottom:6px;">
         <div style="font-weight:700; color:var(--orange); font-size:13px;">${n.name}</div>
         <div style="font-size:12px; line-height:1.5; margin-top:3px;">${n.reason}</div>
         <a href="${url}" target="_blank" rel="noopener" style="
           display:inline-flex; align-items:center; gap:6px; margin-top:8px;
           background:linear-gradient(135deg, #00529c, #0066cc);
-          color:#fff; text-decoration:none;
+          color:var(--ink); text-decoration:none;
           padding:6px 14px; border-radius:18px; font-size:12px; font-weight:700;
-          border:1px solid rgba(255,255,255,0.2);
+          border:1px solid rgba(45,49,66,0.12);
           box-shadow:0 2px 8px rgba(0,82,156,0.4);
         ">🛒 ${n.name} <span style="font-size:10px; opacity:0.8;">· 安麗 iShare ↗</span></a>
       </div>`;
     }).join('')}
-    <div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:6px; text-align:center;">
+    <div style="font-size:10px; color:var(--ink-soft); margin-top:6px; text-align:center;">
       點擊按鈕前往 安麗 iShare 查看對應營養品
     </div>
   </div>
@@ -2161,18 +2560,18 @@ function aiReportCard(rep) {
           <div style="height:50px; display:flex; align-items:flex-end; justify-content:center; padding:2px;">
             <div style="width:100%; height:${Math.max(5,(fe[k]||0))}%; background:${c}; border-radius:3px; box-shadow:0 0 8px ${c}; transition:height 0.5s;"></div>
           </div>
-          <div style="font-size:10px; color:rgba(255,255,255,0.7);">${fe[k] || 0}</div>
+          <div style="font-size:10px; color:var(--ink);">${fe[k] || 0}</div>
         </div>
       `).join('')}
     </div>
 
-    <div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.4); border-radius:8px; font-size:12px; line-height:1.6;">
+    <div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:8px; font-size:12px; line-height:1.6;">
       <b style="color:var(--gold);">💎 旺財建議：</b>${fe.wealthAdvice || ''}
     </div>
   </div>
   ` : ''}
 
-  <div style="text-align:center; font-size:10px; color:rgba(255,255,255,0.3); margin:14px 16px 0;">
+  <div style="text-align:center; font-size:10px; color:rgba(45,49,66,0.20); margin:14px 16px 0;">
     本報告為 AI 養生參考，非醫療診斷
   </div>
   `;
@@ -2189,19 +2588,19 @@ function reportCard(rec, rOrPrev) {
   return `
   <div class="card-cyber mx-4 mt-2 fade-in">
     <div class="font-display glow-orange" style="font-size:20px;">📊 體組成報告</div>
-    <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-top:2px;">${rec.recorded_date}</div>
+    <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">${rec.recorded_date}</div>
 
     <div class="mt-4" style="display:flex; flex-direction:column; gap:8px;">
-      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:rgba(0,0,0,0.4); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg); border-radius:8px;">
         <span>體重</span><span class="font-display glow-blue">${rec.weight} kg</span>
       </div>
-      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:rgba(0,0,0,0.4); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg); border-radius:8px;">
         <span>體脂率 ${r.fatStatus}</span><span class="font-display glow-orange">${rec.body_fat_pct}%</span>
       </div>
-      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:rgba(0,0,0,0.4); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg); border-radius:8px;">
         <span>肌肉量 ${r.muscleStatus}</span><span class="font-display" style="color:#4caf50; text-shadow:0 0 12px #4caf50;">${rec.muscle_mass} kg</span>
       </div>
-      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:rgba(0,0,0,0.4); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg); border-radius:8px;">
         <span>內臟脂肪 ${r.visceralStatus}</span><span class="font-display glow-gold">Lv ${rec.visceral_fat}</span>
       </div>
     </div>
@@ -2209,7 +2608,7 @@ function reportCard(rec, rOrPrev) {
 
   <div class="card-orange mx-4 mt-3">
     <div style="font-size:11px; color:var(--orange); font-weight:700;">🏷️ 體型判定</div>
-    <div class="font-display" style="font-size:28px; color:#fff;">${r.cid}</div>
+    <div class="font-display" style="font-size:28px; color:var(--ink);">${r.cid}</div>
     <div style="font-size:13px; line-height:1.5; opacity:0.85;">${r.cidDesc}</div>
   </div>
 
@@ -2247,7 +2646,7 @@ function renderChart() {
   if (state.bodyRecords.length === 0) {
     return `<div class="card-cyber" style="text-align:center; padding:40px;">
       <div style="font-size:48px;">📊</div>
-      <div style="margin-top:12px; color:rgba(255,255,255,0.6);">尚未記錄數據<br>前往「身體數據」頁開始</div>
+      <div style="margin-top:12px; color:var(--ink-soft);">尚未記錄數據<br>前往「身體數據」頁開始</div>
     </div>`;
   }
   const data = state.bodyRecords;
@@ -2296,7 +2695,7 @@ function renderChart() {
 
 function renderReportList() {
   if (state.bodyRecords.length === 0) {
-    return `<div class="card-cyber" style="text-align:center; padding:40px; color:rgba(255,255,255,0.6);">
+    return `<div class="card-cyber" style="text-align:center; padding:40px; color:var(--ink-soft);">
       尚無報告紀錄
     </div>`;
   }
@@ -2309,7 +2708,7 @@ function renderReportList() {
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
             <div style="font-weight:700;">${rec.recorded_date}</div>
-            <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:2px;">
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
               體重 ${rec.weight}kg · 體脂 ${rec.body_fat_pct}%
             </div>
           </div>
@@ -2332,26 +2731,26 @@ function photoCardHTML(p) {
   const isUrl = imgSrc && imgSrc.startsWith('http');
   return `
     <div class="photo-card fade-in" data-photo-id="${p.id}" data-full="${p.photo_url}" style="
-      background:rgba(15,15,30,0.9); border-radius:12px; overflow:hidden;
+      background:var(--bg-soft); border-radius:12px; overflow:hidden;
       border:2px solid ${p.iPinned ? 'var(--gold)' : 'rgba(0,180,216,0.3)'};
       ${p.iPinned ? 'box-shadow: 0 0 12px rgba(255,209,102,0.4);' : ''}
     ">
-      <div style="display:flex; align-items:center; gap:5px; padding:5px 7px; background:rgba(0,0,0,0.5);">
+      <div style="display:flex; align-items:center; gap:5px; padding:5px 7px; background:#F1F4F8;">
         <div style="font-size:16px;">${p.user.avatar}</div>
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.user.name}${isMine?' (你)':''}</div>
-          <div style="font-size:9px; color:rgba(255,255,255,0.5);">${new Date(p.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</div>
+          <div style="font-size:9px; color:var(--ink-soft);">${new Date(p.created_at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</div>
         </div>
         ${p.iPinned ? '<span style="color:var(--gold); font-size:10px;">📌</span>' : ''}
       </div>
-      <div class="photo-thumb-wrap" style="position:relative; cursor:pointer; background:rgba(0,0,0,0.3);">
+      <div class="photo-thumb-wrap" style="position:relative; cursor:pointer; background:var(--bg);">
         <img ${isUrl ? `loading="lazy"` : ''} src="${imgSrc}" style="width:100%; aspect-ratio:1; object-fit:cover; display:block;" />
       </div>
-      <div style="display:flex; align-items:center; gap:4px; padding:5px 7px; background:rgba(0,0,0,0.4);">
+      <div style="display:flex; align-items:center; gap:4px; padding:5px 7px; background:var(--bg);">
         <button data-like="${p.id}" data-liked="${p.iLiked}" style="
           background:none; border:none; cursor:${isMine ? 'default' : 'pointer'};
           font-size:16px; display:flex; align-items:center; gap:3px;
-          color:#fff; font-family:inherit; opacity:${isMine ? 0.5 : 1};
+          color:var(--ink); font-family:inherit; opacity:${isMine ? 0.5 : 1};
           transition: transform 0.15s; padding:2px;
         " ${isMine ? 'disabled' : ''}>
           <span>${heart}</span><span style="font-size:11px; font-weight:700;">${p.likeCount}</span>
@@ -2359,7 +2758,7 @@ function photoCardHTML(p) {
         ${!isMine ? `
         <button data-pin="${p.id}" data-pinned="${p.iPinned}" style="
           background:none; border:none; cursor:pointer;
-          font-size:13px; color:#fff; font-family:inherit;
+          font-size:13px; color:var(--ink); font-family:inherit;
           margin-left:auto; opacity:${p.iPinned ? 1 : 0.4}; padding:2px;
         ">📌</button>
         ` : ''}
@@ -2375,7 +2774,7 @@ async function renderPhotoWallContent() {
   const photos = await loadPhotoWall(true);
 
   if (!photos.length) {
-    el.innerHTML = `<div class="card-cyber" style="text-align:center; padding:40px; color:rgba(255,255,255,0.6);">
+    el.innerHTML = `<div class="card-cyber" style="text-align:center; padding:40px; color:var(--ink-soft);">
       <div style="font-size:48px;">📷</div>
       <div style="margin-top:12px;">今天還沒有人上傳照片</div>
       <div style="font-size:12px; margin-top:8px;">去打卡上傳第一張吧！</div>
@@ -2386,13 +2785,13 @@ async function renderPhotoWallContent() {
   // 第一頁
   const firstBatch = photos.slice(0, PHOTOS_PER_PAGE);
   el.innerHTML = `
-    <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:8px;">
+    <div style="font-size:11px; color:var(--ink-soft); margin-bottom:8px;">
       📷 共 ${photos.length} 張照片 · 滑到底自動載入更多
     </div>
     <div id="photo-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
       ${firstBatch.map(p => photoCardHTML(p)).join('')}
     </div>
-    <div id="photo-loadmore" style="text-align:center; padding:20px; color:rgba(255,255,255,0.4); font-size:12px;">
+    <div id="photo-loadmore" style="text-align:center; padding:20px; color:var(--ink-soft); font-size:12px;">
       ${photos.length > PHOTOS_PER_PAGE ? '⏬ 下滑載入更多' : '— 已顯示全部 —'}
     </div>
   `;
@@ -2475,23 +2874,24 @@ function showBadgePopup(emoji, title, msg, color) {
   popup.id = 'badge-popup';
   popup.style.cssText = `
     position:fixed; inset:0; z-index:9999;
-    background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
+    background:rgba(45,49,66,0.45); backdrop-filter:blur(6px);
     display:flex; align-items:center; justify-content:center;
     padding:30px; cursor:pointer;
     animation: fadeIn 0.2s ease;
   `;
   popup.innerHTML = `
     <div style="
-      background: linear-gradient(135deg, rgba(26,26,46,0.98), rgba(15,15,30,0.98));
+      background: var(--bg-soft);
       border: 2px solid ${color};
-      border-radius: 20px; padding: 28px 24px;
+      border-radius: 24px; padding: 28px 24px;
       max-width: 320px; text-align: center;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px ${color};
+      box-shadow: 0 12px 36px rgba(45,49,66,0.18);
       animation: slide-up 0.3s ease;
+      color: var(--ink);
     ">
       <div style="font-size:56px; margin-bottom:8px;">${emoji}</div>
       <div class="font-display" style="font-size:20px; color:${color}; text-shadow:0 0 12px ${color}; margin-bottom:10px;">${title}</div>
-      <div style="font-size:14px; color:#fff; line-height:1.7; white-space:pre-line;">${msg}</div>
+      <div style="font-size:14px; color:var(--ink); line-height:1.7; white-space:pre-line;">${msg}</div>
       <button style="
         margin-top:18px; background:transparent; border:1.5px solid ${color};
         color:${color}; padding:8px 24px; border-radius:20px; cursor:pointer;
@@ -2513,82 +2913,94 @@ function openPhotoLightbox(url) {
   `;
   lb.innerHTML = `
     <img src="${url}" style="max-width:100%; max-height:90vh; object-fit:contain; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.5);" />
-    <div style="position:absolute; top:20px; right:20px; color:#fff; font-size:32px; line-height:1; cursor:pointer;">✕</div>
+    <div style="position:absolute; top:20px; right:20px; color:var(--ink); font-size:32px; line-height:1; cursor:pointer;">✕</div>
   `;
   lb.onclick = () => lb.remove();
   document.body.appendChild(lb);
 }
 
+// 排行榜快取：依 rank_type 從 smr_leaderboard_cache 讀取
+// 若 cache 超過 24 小時，自動觸發後端重算（lazy refresh）
+async function ensureLeaderboardFresh() {
+  try {
+    const { data: ageData } = await sb.rpc('smr_leaderboard_age_hours');
+    const ageHours = parseFloat(ageData);
+    if (isNaN(ageHours) || ageHours > 24) {
+      // 觸發後端重算
+      await sb.rpc('smr_compute_leaderboard');
+    }
+  } catch (e) {
+    console.warn('Leaderboard refresh check failed (will use existing cache):', e);
+  }
+}
+
 async function renderRankContent() {
   const tab = state.rankTab;
-  const { data: users } = await sb.from('smr_users').select('*');
-  const { data: bodies } = await sb.from('smr_body_records').select('*');
-  const { data: meals } = await sb.from('smr_meal_checkins').select('*');
-  const { data: quizzes } = await sb.from('smr_quiz_records').select('*');
-  const { data: likes } = await sb.from('smr_photo_likes').select('checkin_id');
+  const el = $('#rank-content');
+  if (el) el.innerHTML = `<div class="runner-loader" style="padding:40px 0;"><div style="font-size:11px; color:var(--ink-soft);">榜單載入中...</div></div>`;
 
-  // 統計每位使用者的累積愛心數
-  const checkinToUser = Object.fromEntries((meals || []).map(m => [m.id, m.user_id]));
-  const heartsByUser = {};
-  for (const l of (likes || [])) {
-    const uid = checkinToUser[l.checkin_id];
-    if (uid) heartsByUser[uid] = (heartsByUser[uid] || 0) + 1;
+  // 第一次開或超過 24 小時 → 重算；否則直接讀
+  await ensureLeaderboardFresh();
+
+  // 一次撈 4 個榜（小量資料）
+  const { data: rows } = await sb.from('smr_leaderboard_cache')
+    .select('*').eq('rank_type', tab).order('rank_position').limit(50);
+
+  if (!rows?.length) {
+    if (el) el.innerHTML = '<div style="text-align:center; padding:40px; color:var(--ink-soft);">尚無排名資料</div>';
+    return;
   }
 
-  let arr = users.map(u => {
-    const myBody = bodies.filter(b => b.user_id === u.id).sort((a,b) => a.recorded_date.localeCompare(b.recorded_date));
-    const fatLost = myBody.length >= 2 ? (myBody[0].body_fat_pct - myBody[myBody.length-1].body_fat_pct) : 0;
-    const checkinDays = new Set(meals.filter(m => m.user_id === u.id).map(m => m.checkin_date)).size;
-    const quizCorrect = quizzes.filter(q => q.user_id === u.id && q.is_correct).length;
-    const hearts = heartsByUser[u.id] || 0;
-    return { ...u, fatLost, checkinDays, quizCorrect, hearts };
-  });
-
-  if (tab === 'fat') arr.sort((a,b) => b.fatLost - a.fatLost);
-  else if (tab === 'checkin') arr.sort((a,b) => b.checkinDays - a.checkinDays);
-  else if (tab === 'quiz') arr.sort((a,b) => b.quizCorrect - a.quizCorrect);
-  else arr.sort((a,b) => b.hearts - a.hearts);
-
-  const myIdx = arr.findIndex(u => u.id === state.user.id);
-  const top10 = arr.slice(0, 10);
-  const showMe = myIdx >= 10;
-
-  const valKey = tab === 'fat' ? 'fatLost' : tab === 'checkin' ? 'checkinDays' : tab === 'quiz' ? 'quizCorrect' : 'hearts';
+  const valKey = tab === 'fat' ? 'fat_lost' : tab === 'checkin' ? 'checkin_days' : tab === 'quiz' ? 'quiz_correct' : 'hearts_count';
   const valSuffix = tab === 'fat' ? '%' : tab === 'checkin' ? ' 天' : tab === 'quiz' ? ' 題' : ' ❤️';
 
-  $('#rank-content').innerHTML = `
-    ${top10.map((u, i) => `
-      <div class="card-cyber" style="margin-bottom:6px; padding:10px 14px; ${u.id === state.user.id ? 'border-color: var(--orange);':''}">
+  const myRow = rows.find(r => r.user_id === state.user.id);
+  const myIdx = myRow ? myRow.rank_position - 1 : -1;
+  const top10 = rows.slice(0, 10);
+  const showMe = myRow && myRow.rank_position > 10;
+
+  el.innerHTML = `
+    ${top10.map((u, i) => {
+      const isMe = u.user_id === state.user.id;
+      const isFriend = (state.friends || []).some(f => f.id === u.user_id);
+      const val = parseFloat(u[valKey]) || 0;
+      return `
+      <div class="card-cyber" style="margin-bottom:6px; padding:10px 14px; ${isMe ? 'border-color: var(--orange);':''}">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="font-display" style="font-size:22px; width:36px; text-align:center; ${i<3?'color:var(--gold); text-shadow:0 0 12px var(--gold)':'color:rgba(255,255,255,0.5)'}">
-            ${i+1}
-          </div>
-          <div style="font-size:28px;">${u.avatar}</div>
+          <div class="font-display" style="font-size:22px; width:36px; text-align:center; ${i<3?'color:var(--gold); text-shadow:0 0 12px var(--gold)':'color:var(--ink-soft)'}">${i+1}</div>
+          <div style="font-size:28px;">${u.user_avatar || '👤'}</div>
           <div style="flex:1;">
-            <div style="font-weight:700;">${u.name} ${u.id === state.user.id ? '<span style="font-size:11px; color:var(--orange);">(你)</span>':''}</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.5);">Lv ${u.level}</div>
+            <div style="font-weight:700;">${u.user_name} ${isMe ? '<span style="font-size:11px; color:var(--orange);">(你)</span>' : ''}${isFriend && !isMe ? '<span style="font-size:11px; color:var(--mint); margin-left:4px;">· 好友</span>' : ''}</div>
+            <div style="font-size:11px; color:var(--ink-soft);">Lv ${u.user_level || 1}</div>
           </div>
-          <div class="font-display glow-orange" style="font-size:18px;">
-            ${tab==='fat' ? (u[valKey] >= 0 ? '↓' : '↑') : ''}${Math.abs(u[valKey]).toFixed(tab==='fat'?1:0)}${valSuffix}
-          </div>
+          <div class="font-display glow-orange" style="font-size:18px;">${tab==='fat' ? (val >= 0 ? '↓' : '↑') : ''}${Math.abs(val).toFixed(tab==='fat'?1:0)}${valSuffix}</div>
+          ${!isMe ? `<button data-rank-poke-btn="${u.user_id}" data-rank-poke-name="${u.user_name}" style="
+            background:linear-gradient(135deg, var(--primary), #FF8FB3); border:none; color:#fff;
+            padding:5px 10px; border-radius:999px; font-family:inherit; font-size:11px; font-weight:700;
+            cursor:pointer; box-shadow:0 2px 6px rgba(255,107,107,0.3); white-space:nowrap;
+          ">👉戳</button>` : ''}
         </div>
-      </div>
-    `).join('')}
+      </div>`;
+    }).join('')}
     ${showMe ? `
-      <div style="margin-top:12px; padding:8px 0; border-top:1px dashed rgba(255,255,255,0.2);"></div>
+      <div style="margin-top:12px; padding:8px 0; border-top:1px dashed var(--border);"></div>
       <div class="card-cyber" style="border-color:var(--orange); padding:10px 14px;">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="font-display" style="font-size:18px; width:36px; text-align:center; color:var(--orange)">#${myIdx+1}</div>
+          <div class="font-display" style="font-size:18px; width:36px; text-align:center; color:var(--orange)">#${myRow.rank_position}</div>
           <div style="font-size:28px;">${state.user.avatar}</div>
           <div style="flex:1;">
             <div style="font-weight:700;">${state.user.name} <span style="font-size:11px; color:var(--orange);">(你)</span></div>
           </div>
           <div class="font-display glow-orange" style="font-size:18px;">
-            ${tab==='fat' ? (arr[myIdx][valKey] >= 0 ? '↓' : '↑') : ''}${Math.abs(arr[myIdx][valKey]).toFixed(tab==='fat'?1:0)}${valSuffix}
+            ${tab==='fat' ? (parseFloat(myRow[valKey]) >= 0 ? '↓' : '↑') : ''}${Math.abs(parseFloat(myRow[valKey])||0).toFixed(tab==='fat'?1:0)}${valSuffix}
           </div>
         </div>
       </div>
     ` : ''}
+
+    <div style="text-align:center; margin-top:14px; padding:8px; font-size:10px; color:var(--ink-soft);">
+      📊 排行榜每日凌晨刷新一次 · 上次更新：${rows[0]?.generated_at ? new Date(rows[0].generated_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '剛剛'}
+    </div>
   `;
 }
 
@@ -2601,14 +3013,14 @@ function renderLogin() {
         <div style="margin-top:60px; text-align:center;">
           <div class="font-display glow-orange" style="font-size:44px; line-height:1;">SUPER MENG</div>
           <div class="font-handwrite glow-blue" style="font-size:28px; margin-top:4px;">超艋無差別減脂大賽</div>
-          <div style="margin-top:12px; font-size:13px; color:rgba(255,255,255,0.5);">紐崔萊 × Ready Player One</div>
+          <div style="margin-top:12px; font-size:13px; color:var(--ink-soft);">紐崔萊 × Ready Player One</div>
         </div>
 
         <div style="margin-top:60px;">
           <div style="font-size:13px; color:var(--blue); font-weight:700; margin-bottom:8px;">📱 輸入電話號碼</div>
           <input id="login-phone" class="input-cyber" type="tel" placeholder="09xxxxxxxx" />
           <button class="btn-primary" id="phone-submit" style="width:100%; margin-top:16px;">下一步 →</button>
-          <button id="admin-link" style="background:none; border:none; color:rgba(255,255,255,0.3); margin-top:24px; width:100%; font-family:inherit; cursor:pointer; font-size:12px;">後台管理 ›</button>
+          <button id="admin-link" style="background:none; border:none; color:rgba(45,49,66,0.20); margin-top:24px; width:100%; font-family:inherit; cursor:pointer; font-size:12px;">後台管理 ›</button>
         </div>
       </div>
     `;
@@ -2627,7 +3039,7 @@ function renderLogin() {
         <div style="margin-top:32px; display:flex; flex-direction:column; gap:14px;">
           <div>
             <label style="font-size:13px; color:var(--blue); font-weight:700;">📱 電話</label>
-            <div class="input-cyber mt-1" style="background:rgba(0,0,0,0.6); color:rgba(255,255,255,0.6);">${state.registerData.phone}</div>
+            <div class="input-cyber mt-1" style="background:#E8ECF1; color:var(--ink-soft);">${state.registerData.phone}</div>
           </div>
           <div>
             <label style="font-size:13px; color:var(--blue); font-weight:700;">👤 姓名</label>
@@ -2645,7 +3057,7 @@ function renderLogin() {
               <option value="female">女</option>
             </select>
           </div>
-          <div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:-4px; line-height:1.4;">
+          <div style="font-size:10px; color:var(--ink-soft); margin-top:-4px; line-height:1.4;">
             ⚠️ 用於八字五行財運分析與體組成標準判讀（不會公開）
           </div>
           <div>
@@ -2655,14 +3067,29 @@ function renderLogin() {
           <div>
             <label style="font-size:13px; color:var(--blue); font-weight:700;">🎭 選擇頭像</label>
             <div id="avatar-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px;">
-              ${AVATARS.map((a,i) => `<div class="avatar-cell ${i===0?'selected':''}" data-avatar="${a}">${a}</div>`).join('')}
+              ${AVATARS.map((a,i) => `<div class="avatar-cell ${i===0?'selected':''}" data-avatar="${a}" style="font-size:32px;">${a}</div>`).join('')}
             </div>
           </div>
+
+          <!-- 開賽前體重照片（必填） -->
+          <div style="background:var(--mint-l); border-radius:14px; padding:12px; border:1.5px dashed var(--mint);">
+            <label style="font-size:13px; color:var(--primary); font-weight:900;">📷 開賽前體重秤照片（必填）</label>
+            <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">
+              拍下您現在站上體重秤的照片，比賽結束會作為對比基準
+            </div>
+            <input id="reg-weight-photo" type="file" accept="image/*" capture="environment" style="display:none;" />
+            <button type="button" id="reg-weight-btn" class="btn-cyber" style="width:100%; margin-top:10px;">📸 拍照 / 選擇照片</button>
+            <div id="reg-weight-preview"></div>
+          </div>
+
           <button id="reg-submit" class="btn-primary" style="margin-top:16px;">完成註冊 · 開始挑戰</button>
         </div>
       </div>
     `;
     let avatar = AVATARS[0];
+    let weightPhotoFile = null;
+    let weightPhotoUrl = null;
+
     $$('#avatar-grid .avatar-cell').forEach(el => {
       el.onclick = () => {
         $$('#avatar-grid .avatar-cell').forEach(x => x.classList.remove('selected'));
@@ -2671,6 +3098,21 @@ function renderLogin() {
         sfx.click();
       };
     });
+
+    // 體重照片上傳
+    $('#reg-weight-btn').onclick = () => $('#reg-weight-photo').click();
+    $('#reg-weight-photo').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      weightPhotoFile = f;
+      try {
+        const preview = await fileToCompressedBase64(f, 500, 0.55);
+        $('#reg-weight-preview').innerHTML = `
+          <img src="${preview}" style="width:100%; max-height:200px; object-fit:contain; border-radius:12px; border:2px solid var(--mint); margin-top:10px; background:#fff;" />
+          <div style="font-size:11px; color:var(--mint); text-align:center; margin-top:4px;">✓ 已選擇，送出時自動上傳</div>
+        `;
+      } catch { showToast('圖片處理失敗', 'error'); }
+    };
+
     $('#back-btn').onclick = () => { state.loginStep = 'phone'; render(); };
     $('#reg-submit').onclick = async () => {
       const name = $('#reg-name').value.trim();
@@ -2681,11 +3123,23 @@ function renderLogin() {
       if (!pwd) return showToast('請輸入密碼', 'error');
       if (!birthdate) return showToast('請選擇生日', 'error');
       if (!gender) return showToast('請選擇性別', 'error');
+      if (!weightPhotoFile) return showToast('請上傳開賽前體重照片', 'error');
+
+      const btn = $('#reg-submit');
+      btn.disabled = true; btn.textContent = '上傳照片中...';
       try {
-        await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender);
+        // 先用臨時 user ID 作為檔名（用 phone 代替 UUID）
+        const ts = Date.now();
+        const folderId = state.registerData.phone || 'unknown';
+        const { photoUrl } = await uploadPhotoWithThumb(weightPhotoFile, `register/${folderId}`);
+        weightPhotoUrl = photoUrl;
+
+        btn.textContent = '註冊中...';
+        await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
         showToast('🎉 歡迎加入！');
         state.page = 'home'; render();
       } catch (e) {
+        btn.disabled = false; btn.textContent = '完成註冊 · 開始挑戰';
         showToast(e.message || '註冊失敗', 'error');
       }
     };
@@ -2767,7 +3221,7 @@ function renderAdmin() {
             <button class="btn-cyber" id="ad-quiz-export" style="font-size:12px; padding:6px 12px;">📤 匯出 MD</button>
           </div>
         </div>
-        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">點擊任一天進行編輯 · 共 28 天</div>
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">點擊任一天進行編輯 · 共 28 天</div>
         <div id="ad-quiz-grid" style="margin-top:12px; display:grid; grid-template-columns:repeat(7,1fr); gap:6px;"></div>
         <div id="ad-quiz-editor" style="margin-top:12px;"></div>
       </div>
@@ -2782,7 +3236,7 @@ function renderAdmin() {
 
       <div class="card-cyber" style="margin-top:12px;">
         <div style="font-weight:700;">🔬 AI 分析金鑰（Claude）</div>
-        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">
           前往 <a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue);">Anthropic Console</a> 取得 API Key (sk-ant-...)
         </div>
         <div style="display:flex; gap:8px; margin-top:8px;">
@@ -2843,13 +3297,13 @@ const todayDay = () => gameDay();
 async function loadAdminData() {
   const { data: users } = await sb.from('smr_users').select('*').order('xp', { ascending: false });
   $('#ad-users').innerHTML = users.map(u => `
-    <div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px;">
+    <div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
       <span style="font-size:20px;">${u.avatar}</span>
       <span style="flex:1;">${u.name}</span>
       <span style="opacity:0.6;">${u.phone}</span>
       <span class="glow-orange">Lv${u.level} · ${u.xp}XP</span>
     </div>
-  `).join('') || '<div style="color:rgba(255,255,255,0.4);">尚無玩家</div>';
+  `).join('') || '<div style="color:var(--ink-soft);">尚無玩家</div>';
 
   await loadQuizGrid();
 }
@@ -2890,10 +3344,10 @@ function openQuizEditor(day) {
   const data = q || { day_number: day, question: '', option_a: '', option_b: '', option_c: '', option_d: '', answer_index: 0, explanation: '' };
 
   $('#ad-quiz-editor').innerHTML = `
-    <div class="card-cyber" style="background:rgba(0,0,0,0.6); border-color:var(--orange);">
+    <div class="card-cyber" style="background:#E8ECF1; border-color:var(--orange);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <div class="font-display glow-orange" style="font-size:20px;">DAY ${day} ${isNew ? '· 新增' : '· 編輯'}</div>
-        <button id="ad-q-close" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:20px; cursor:pointer;">✕</button>
+        <button id="ad-q-close" style="background:none; border:none; color:var(--ink-soft); font-size:20px; cursor:pointer;">✕</button>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:10px;">
@@ -2962,14 +3416,14 @@ function openQuizEditor(day) {
 
 function openQuizImport() {
   $('#ad-quiz-editor').innerHTML = `
-    <div class="card-cyber" style="background:rgba(0,0,0,0.6); border-color:var(--orange);">
+    <div class="card-cyber" style="background:#E8ECF1; border-color:var(--orange);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <div class="font-display glow-orange" style="font-size:18px;">📋 批次匯入題庫</div>
-        <button id="ad-import-close" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:20px; cursor:pointer;">✕</button>
+        <button id="ad-import-close" style="background:none; border:none; color:var(--ink-soft); font-size:20px; cursor:pointer;">✕</button>
       </div>
-      <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-bottom:8px;">
+      <div style="font-size:11px; color:var(--ink-soft); margin-bottom:8px;">
         貼上格式：<br>
-        <code style="background:rgba(0,0,0,0.6); padding:2px 4px; border-radius:4px;">Day 1<br>問題：xxx<br>A. xxx<br>B. xxx<br>C. xxx<br>D. xxx<br>答案：B<br>解析：xxx</code>
+        <code style="background:#E8ECF1; padding:2px 4px; border-radius:4px;">Day 1<br>問題：xxx<br>A. xxx<br>B. xxx<br>C. xxx<br>D. xxx<br>答案：B<br>解析：xxx</code>
       </div>
       <textarea id="ad-import-text" class="input-cyber" rows="12" style="resize:vertical; font-family:monospace; font-size:12px;" placeholder="Day 1
 問題：紐崔萊蛋白質粉每份含多少克蛋白質？
@@ -3077,10 +3531,18 @@ function attachListeners() {
   });
   $$('[data-rtab]').forEach(el => el.onclick = () => { state.recordTab = el.dataset.rtab; sfx.click(); render(); });
 
-  if (state.page === 'rank') renderRankContent();
+  if (state.page === 'rank') {
+    renderRankContent().then(() => {
+      document.querySelectorAll('[data-rank-poke-btn]').forEach(btn => {
+        btn.onclick = () => openPokeModal(btn.dataset.rankPokeBtn, btn.dataset.rankPokeName);
+      });
+    });
+  }
   if (state.page === 'photowall') renderPhotoWallContent();
   if (state.page === 'home') {
     updateHomeHearts();
+    renderFriendsGrid();
+    renderPokesCard();
     const logoutBtn = $('#logout-btn');
     if (logoutBtn) logoutBtn.onclick = () => {
       if (!confirm('確定要登出嗎？')) return;
@@ -3240,8 +3702,8 @@ function showInstallBanner() {
       <div style="font-weight:900; font-size:14px;">加到主畫面更好用</div>
       <div style="font-size:11px; opacity:0.9; margin-top:2px;">像 App 一樣開啟，不會誤關</div>
     </div>
-    <button id="install-yes" style="background:rgba(255,255,255,0.25); border:none; color:#fff; padding:8px 14px; border-radius:20px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">安裝</button>
-    <button id="install-no" style="background:none; border:none; color:rgba(255,255,255,0.6); cursor:pointer; font-size:18px;">✕</button>
+    <button id="install-yes" style="background:rgba(255,255,255,0.25); border:none; color:var(--ink); padding:8px 14px; border-radius:20px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">安裝</button>
+    <button id="install-no" style="background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:18px;">✕</button>
   `;
   document.body.appendChild(div);
   document.getElementById('install-yes').onclick = async () => {
@@ -3273,7 +3735,7 @@ function showIOSInstallTip() {
         <div style="flex:1; font-size:12px; line-height:1.5;">
           <b>加到主畫面：</b>點底部 <span style="font-size:16px;">⎘</span> → 「加入主畫面」
         </div>
-        <button id="ios-no" style="background:none; border:none; color:#fff; cursor:pointer;">✕</button>`;
+        <button id="ios-no" style="background:none; border:none; color:var(--ink); cursor:pointer;">✕</button>`;
       document.body.appendChild(div);
       document.getElementById('ios-no').onclick = () => { localStorage.setItem('smr_ios_dismissed', '1'); div.remove(); };
     }, 5000);
@@ -3282,12 +3744,29 @@ function showIOSInstallTip() {
 
 // ============ INIT ============
 async function init() {
-  await loadConfig();
-  const savedPhone = localStorage.getItem('smr_phone');
-  if (savedPhone) {
-    const u = await loginUser(savedPhone);
-    if (u) { state.page = 'home'; render(); showIOSInstallTip(); return; }
+  // 5 秒 fallback：避免無限等待
+  const failsafe = setTimeout(() => {
+    if (state.page === 'login' && !state.user) {
+      state.page = 'login'; render();
+    }
+  }, 5000);
+
+  try {
+    await loadConfig();
+    const savedPhone = localStorage.getItem('smr_phone');
+    if (savedPhone) {
+      const u = await loginUser(savedPhone);
+      if (u) {
+        clearTimeout(failsafe);
+        state.page = 'home'; render();
+        if (typeof showIOSInstallTip === 'function') showIOSInstallTip();
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('Init error:', e);
   }
+  clearTimeout(failsafe);
   state.page = 'login'; render();
 }
 init();
