@@ -3325,59 +3325,29 @@ function renderLogin() {
           <div style="margin-top:12px; font-size:13px; color:var(--ink-soft);">紐崔萊 × Ready Player One</div>
         </div>
 
-        <div style="margin-top:60px;">
-          <div style="font-size:13px; color:var(--blue); font-weight:700; margin-bottom:8px;">📱 輸入電話號碼</div>
-          <input id="login-phone" class="input-cyber" type="tel" placeholder="09xxxxxxxx" />
-          <button class="btn-primary" id="phone-submit" style="width:100%; margin-top:16px;">下一步 →</button>
-          <button id="admin-link" style="background:none; border:none; color:rgba(45,49,66,0.20); margin-top:24px; width:100%; font-family:inherit; cursor:pointer; font-size:12px;">後台管理 ›</button>
+        <div style="margin-top:48px; display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <div style="font-size:13px; color:var(--blue); font-weight:700; margin-bottom:6px;">📱 電話號碼</div>
+            <input id="login-phone" class="input-cyber" type="tel" placeholder="09xxxxxxxx" />
+          </div>
+          <div>
+            <div style="font-size:13px; color:var(--blue); font-weight:700; margin-bottom:6px;">🔒 PIN 碼</div>
+            <input id="login-pin" class="input-cyber" type="tel" maxlength="6"
+              placeholder="4～6 位數字"
+              style="letter-spacing:6px; font-size:20px;" />
+            <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">
+              首次登入或忘記 PIN？留空後點登入，系統會引導您設定
+            </div>
+          </div>
+          <button class="btn-primary" id="phone-submit" style="width:100%; margin-top:4px;">登入 →</button>
+          <button id="admin-link" style="background:none; border:none; color:rgba(45,49,66,0.20); margin-top:8px; width:100%; font-family:inherit; cursor:pointer; font-size:12px;">後台管理 ›</button>
         </div>
       </div>
     `;
     $('#phone-submit').onclick = handlePhoneSubmit;
     $('#admin-link').onclick = () => { state.page = 'admin'; render(); };
-    $('#login-phone').onkeydown = (e) => { if (e.key === 'Enter') handlePhoneSubmit(); };
-    return;
-  }
-  if (step === 'pin') {
-    const u = state.loginPending;
-    app.innerHTML = `
-      <div class="flex-1 fade-in" style="display:flex; flex-direction:column; padding:40px 24px; min-height:100vh;">
-        <button id="back-btn" style="background:none; border:none; color:var(--blue); cursor:pointer; font-family:inherit;">‹ 返回</button>
-        <div style="margin-top:40px; text-align:center;">
-          <div style="font-size:48px;">${u?.avatar || '👤'}</div>
-          <div class="font-display" style="font-size:22px; margin-top:8px;">${u?.name || ''}</div>
-          <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">請輸入您的 PIN 碼登入</div>
-        </div>
-        <div style="margin-top:40px;">
-          <input id="pin-input" class="input-cyber" type="tel" maxlength="6"
-            placeholder="• • • •" style="text-align:center; font-size:28px; letter-spacing:12px;" />
-          <button class="btn-primary" id="pin-submit" style="width:100%; margin-top:16px;">確認登入</button>
-          <div style="text-align:center; margin-top:12px;">
-            <button id="pin-forgot" style="background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; font-family:inherit;">
-              忘記 PIN？請聯絡主辦單位重置
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-    $('#back-btn').onclick = () => { state.loginStep = 'phone'; state.loginPending = null; render(); };
-    $('#pin-input').onkeydown = (e) => { if (e.key === 'Enter') $('#pin-submit').click(); };
-    $('#pin-forgot').onclick = () => showToast('請聯絡主辦單位，後台可重置您的 PIN', 'error');
-    $('#pin-submit').onclick = async () => {
-      const pin = $('#pin-input').value.trim();
-      if (!pin) return showToast('請輸入 PIN 碼', 'error');
-      const btn = $('#pin-submit');
-      btn.disabled = true; btn.textContent = '驗證中...';
-      const { data: ok } = await sb.rpc('smr_verify_user_pin', { p_user_id: u.id, p_pin: pin });
-      if (ok) {
-        state.loginPending = null;
-        await completeLogin(u);
-      } else {
-        showToast('PIN 碼錯誤，請再試一次', 'error');
-        btn.disabled = false; btn.textContent = '確認登入';
-        $('#pin-input').value = '';
-      }
-    };
+    $('#login-pin').onkeydown = (e) => { if (e.key === 'Enter') handlePhoneSubmit(); };
+    $('#login-phone').onkeydown = (e) => { if (e.key === 'Enter') $('#login-pin').focus(); };
     return;
   }
 
@@ -3569,24 +3539,39 @@ function renderLogin() {
 
 async function handlePhoneSubmit() {
   const phone = $('#login-phone').value.trim();
-  if (!phone) return showToast('請輸入電話', 'error');
+  const pin   = ($('#login-pin')?.value || '').trim();
+  if (!phone) return showToast('請輸入電話號碼', 'error');
   sfx.click();
+
   const existing = await checkPhone(phone);
-  if (existing) {
-    if (existing.pin_hash) {
-      // 已設 PIN → 進入 PIN 驗證步驟
-      state.loginPending = existing;
-      state.loginStep = 'pin';
-      render();
-    } else {
-      // 尚未設 PIN → 強制先設定，不能跳過
-      state.loginPending = existing;
-      state.loginStep = 'set-pin';
-      render();
-    }
-  } else {
+  if (!existing) {
+    // 查無此號 → 前往註冊
     state.registerData = { phone };
-    state.loginStep = 'register'; render();
+    state.loginStep = 'register';
+    render();
+    return;
+  }
+
+  if (!existing.pin_hash) {
+    // 從未設過 PIN → 強制設定（不可跳過）
+    state.loginPending = existing;
+    state.loginStep = 'set-pin';
+    render();
+    return;
+  }
+
+  // 已有 PIN：直接在同一畫面驗證
+  if (!pin) return showToast('請輸入 PIN 碼', 'error');
+  const btn = $('#phone-submit');
+  btn.disabled = true; btn.textContent = '驗證中...';
+  const { data: ok } = await sb.rpc('smr_verify_user_pin', { p_user_id: existing.id, p_pin: pin });
+  if (ok) {
+    await completeLogin(existing);
+  } else {
+    showToast('PIN 碼錯誤，請再試一次', 'error');
+    btn.disabled = false; btn.textContent = '登入 →';
+    $('#login-pin').value = '';
+    $('#login-pin').focus();
   }
 }
 
