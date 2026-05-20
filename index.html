@@ -3380,6 +3380,51 @@ function renderLogin() {
     };
     return;
   }
+
+  // 首次設定 PIN（舊玩家第一次登入強制設定）
+  if (step === 'set-pin') {
+    const u = state.loginPending;
+    app.innerHTML = `
+      <div class="flex-1 fade-in" style="display:flex; flex-direction:column; padding:40px 24px; min-height:100vh;">
+        <div style="margin-top:40px; text-align:center;">
+          <div style="font-size:48px;">${u?.avatar || '👤'}</div>
+          <div class="font-display" style="font-size:22px; margin-top:8px;">${u?.name || ''}</div>
+          <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">請設定您的個人 PIN 碼</div>
+          <div style="font-size:12px; color:var(--primary); margin-top:8px; background:var(--primary-l); border-radius:10px; padding:8px 16px; line-height:1.5;">
+            🔒 為保護帳戶安全，每次登入需要 PIN 碼<br>
+            請勿與他人分享
+          </div>
+        </div>
+        <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">設定 PIN 碼（4～6 位數字）</label>
+            <input id="setpin-input" class="input-cyber mt-1" type="tel" maxlength="6"
+              placeholder="請輸入數字" style="text-align:center; font-size:24px; letter-spacing:8px;" />
+          </div>
+          <div>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">再次確認 PIN</label>
+            <input id="setpin-confirm" class="input-cyber mt-1" type="tel" maxlength="6"
+              placeholder="再輸入一次" style="text-align:center; font-size:24px; letter-spacing:8px;" />
+          </div>
+          <button class="btn-primary" id="setpin-submit" style="margin-top:8px;">確認設定 · 進入 APP</button>
+        </div>
+      </div>
+    `;
+    $('#setpin-submit').onclick = async () => {
+      const pin = $('#setpin-input').value.trim();
+      const confirm = $('#setpin-confirm').value.trim();
+      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('PIN 碼需為 4～6 位數字', 'error');
+      if (pin !== confirm) return showToast('兩次 PIN 碼不一致', 'error');
+      const btn = $('#setpin-submit');
+      btn.disabled = true; btn.textContent = '設定中...';
+      await sb.rpc('smr_set_user_pin', { p_user_id: u.id, p_pin: pin });
+      state.loginPending = null;
+      showToast('🔒 PIN 碼設定完成！');
+      await completeLogin(u);
+    };
+    return;
+  }
+
   if (step === 'register') {
     app.innerHTML = `
       <div class="flex-1 fade-in" style="padding:40px 24px;">
@@ -3423,10 +3468,10 @@ function renderLogin() {
           </div>
 
           <div>
-            <label style="font-size:13px; color:var(--blue); font-weight:700;">🔒 設定個人 PIN 碼（選填，建議設定）</label>
-            <input id="reg-pin" class="input-cyber mt-1" type="tel" maxlength="6" placeholder="4～6 位數字（可留空）" />
+            <label style="font-size:13px; color:var(--primary); font-weight:700;">🔒 設定個人 PIN 碼（必填）</label>
+            <input id="reg-pin" class="input-cyber mt-1" type="tel" maxlength="6" placeholder="4～6 位數字" />
             <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.4;">
-              設定後往後需輸入 PIN 碼登入，可保護您的帳戶
+              往後每次登入需要輸入，請勿與他人分享
             </div>
           </div>
 
@@ -3494,7 +3539,7 @@ function renderLogin() {
       if (!pwd) return showToast('請輸入報名密碼', 'error');
       if (!birthdate) return showToast('請選擇生日', 'error');
       if (!gender) return showToast('請選擇性別', 'error');
-      if (pin && (pin.length < 4 || !/^\d+$/.test(pin))) return showToast('PIN 碼需為 4～6 位數字', 'error');
+      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('請設定 4～6 位數字 PIN 碼', 'error');
       if (!consent) return showToast('請閱讀並勾選隱私同意', 'error');
       if (!weightPhotoFile) return showToast('請上傳開賽前體重照片', 'error');
 
@@ -3507,11 +3552,10 @@ function renderLogin() {
 
         btn.textContent = '註冊中...';
         const newUser = await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
-        // 若有填 PIN 才設定
-        if (pin && newUser?.id) {
+        if (newUser?.id) {
           await sb.rpc('smr_set_user_pin', { p_user_id: newUser.id, p_pin: pin });
         }
-        showToast('🎉 歡迎加入！');
+        showToast('🎉 歡迎加入！PIN 碼已設定');
         state.page = 'home'; render();
         ensureCleanupFresh();
       } catch (e) {
@@ -3535,8 +3579,10 @@ async function handlePhoneSubmit() {
       state.loginStep = 'pin';
       render();
     } else {
-      // 尚未設 PIN（舊玩家）→ 直接登入，不打擾
-      await completeLogin(existing);
+      // 尚未設 PIN → 強制先設定，不能跳過
+      state.loginPending = existing;
+      state.loginStep = 'set-pin';
+      render();
     }
   } else {
     state.registerData = { phone };
