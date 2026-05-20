@@ -3423,10 +3423,10 @@ function renderLogin() {
           </div>
 
           <div>
-            <label style="font-size:13px; color:var(--primary); font-weight:700;">🔒 設定個人 PIN 碼（必填）</label>
-            <input id="reg-pin" class="input-cyber mt-1" type="tel" maxlength="6" placeholder="4～6 位數字" />
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">🔒 設定個人 PIN 碼（選填，建議設定）</label>
+            <input id="reg-pin" class="input-cyber mt-1" type="tel" maxlength="6" placeholder="4～6 位數字（可留空）" />
             <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.4;">
-              往後每次登入需輸入 PIN 碼，請勿與他人分享
+              設定後往後需輸入 PIN 碼登入，可保護您的帳戶
             </div>
           </div>
 
@@ -3494,7 +3494,7 @@ function renderLogin() {
       if (!pwd) return showToast('請輸入報名密碼', 'error');
       if (!birthdate) return showToast('請選擇生日', 'error');
       if (!gender) return showToast('請選擇性別', 'error');
-      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('請設定 4～6 位數字 PIN 碼', 'error');
+      if (pin && (pin.length < 4 || !/^\d+$/.test(pin))) return showToast('PIN 碼需為 4～6 位數字', 'error');
       if (!consent) return showToast('請閱讀並勾選隱私同意', 'error');
       if (!weightPhotoFile) return showToast('請上傳開賽前體重照片', 'error');
 
@@ -3507,11 +3507,11 @@ function renderLogin() {
 
         btn.textContent = '註冊中...';
         const newUser = await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
-        // 設定 PIN（SECURITY DEFINER RPC，hash 不暴露前端）
-        if (newUser?.id) {
+        // 若有填 PIN 才設定
+        if (pin && newUser?.id) {
           await sb.rpc('smr_set_user_pin', { p_user_id: newUser.id, p_pin: pin });
         }
-        showToast('🎉 歡迎加入！PIN 碼已設定');
+        showToast('🎉 歡迎加入！');
         state.page = 'home'; render();
         ensureCleanupFresh();
       } catch (e) {
@@ -3535,9 +3535,8 @@ async function handlePhoneSubmit() {
       state.loginStep = 'pin';
       render();
     } else {
-      // 尚未設 PIN（舊玩家寬限期）→ 直接登入，提示設定
+      // 尚未設 PIN（舊玩家）→ 直接登入，不打擾
       await completeLogin(existing);
-      showToast('⚠️ 請至「個人資料」設定 PIN 碼以保護帳戶', 'error');
     }
   } else {
     state.registerData = { phone };
@@ -3609,8 +3608,17 @@ function renderAdmin() {
           <input id="ad-start" type="date" class="input-cyber" value="${state.config?.start_date || ''}" />
           <button class="btn-cyber" id="ad-save-start">儲存開始日期</button>
           <button class="btn-primary" id="ad-reset" style="background:linear-gradient(135deg,#ff3d3d,#ff7c2a);">⚠️ 重置比賽（清除進度，保留帳號）</button>
-          <button class="btn-primary" id="ad-delete-all-users" style="background:linear-gradient(135deg,#7b0000,#c0392b); margin-top:4px;">🗑️ 刪除全部玩家帳號（完全清空）</button>
         </div>
+      </div>
+
+      <div class="card-cyber" style="margin-top:12px; border:2px solid #c0392b;">
+        <div style="font-weight:700; color:#c0392b;">🗑️ 換屆清空（刪除全部帳號）</div>
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.5;">
+          刪除所有玩家帳號及所有資料，下一屆參賽者需重新報名。<br>此操作無法復原，請謹慎使用。
+        </div>
+        <button class="btn-primary" id="ad-delete-all-users" style="background:linear-gradient(135deg,#7b0000,#c0392b); width:100%; margin-top:10px;">
+          🗑️ 刪除全部玩家帳號
+        </button>
       </div>
 
       <div class="card-cyber" style="margin-top:12px;">
@@ -3692,62 +3700,32 @@ function renderAdmin() {
     showToast('✓ 已更新開始日期');
     await loadConfig();
   };
-  // Risk 8: 重置比賽 — 需輸入 RESET 兩次確認，同時清除 smr_users 所有進度欄位
+  // 重置比賽（保留帳號）— 透過伺服器端 RPC，一次清乾淨
   $('#ad-reset').onclick = async () => {
-    const typed = window.prompt('⚠️ 高危險操作！\n\n清除所有玩家比賽進度（保留帳號/電話/姓名）。\n\n請輸入 RESET 確認：');
+    const typed = window.prompt('⚠️ 高危險操作！\n清除所有玩家比賽進度（保留帳號/電話/姓名）。\n\n請輸入 RESET 確認：');
     if (typed !== 'RESET') return showToast('操作已取消', 'error');
     const typed2 = window.prompt('最後確認，再次輸入 RESET：');
     if (typed2 !== 'RESET') return showToast('操作已取消', 'error');
-    try {
-      // 清除子表
-      await sb.from('smr_body_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_quiz_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_meal_checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_badges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_friendships').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_pokes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_photo_likes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_leaderboard_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      // 重置 smr_users 所有進度欄位（保留帳號基本資料）
-      await sb.from('smr_users').update({
-        xp: 0, level: 1, ai_used: false,
-        ai_report: null,
-        face_photo_url: null, tongue_photo_url: null,
-        final_weight: null, final_body_fat_pct: null,
-        final_muscle_mass: null, final_visceral_fat: null,
-        final_weight_photo_url: null, final_submitted_at: null,
-      }).neq('id', '00000000-0000-0000-0000-000000000000');
-      showToast('✓ 已重置比賽（保留帳號）');
-      await loadAdminData();
-    } catch (e) {
-      showToast('重置失敗：' + e.message, 'error');
-    }
+    const btn = $('#ad-reset'); btn.disabled = true; btn.textContent = '重置中...';
+    const { data: r } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
+    btn.disabled = false; btn.textContent = '⚠️ 重置比賽（清除進度，保留帳號）';
+    if (!r?.ok) return showToast('重置失敗：' + (r?.error || '未知錯誤'), 'error');
+    showToast('✓ ' + r.msg);
+    await loadAdminData();
   };
 
-  // 完全刪除所有玩家帳號（換屆用）
+  // 完全刪除所有玩家帳號（換屆用）— 伺服器端 RPC
   $('#ad-delete-all-users').onclick = async () => {
-    const typed = window.prompt('🔴 極度危險！\n\n這將刪除全部玩家帳號及所有資料，無法復原。\n下屆參賽者需重新報名。\n\n請輸入 DELETE ALL 確認：');
+    const typed = window.prompt('🔴 極度危險！\n刪除全部玩家帳號及所有資料，無法復原。\n下屆參賽者需重新報名。\n\n請輸入 DELETE ALL 確認：');
     if (typed !== 'DELETE ALL') return showToast('操作已取消', 'error');
     const typed2 = window.prompt('最後確認，再次輸入 DELETE ALL：');
     if (typed2 !== 'DELETE ALL') return showToast('操作已取消', 'error');
-    try {
-      // 子表先刪（外鍵順序）
-      await sb.from('smr_body_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_quiz_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_meal_checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_badges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_friendships').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_pokes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_photo_likes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_ai_queue').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_leaderboard_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      // 最後刪玩家帳號
-      await sb.from('smr_users').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      showToast('✅ 所有玩家帳號已刪除，可重新報名');
-      await loadAdminData();
-    } catch (e) {
-      showToast('刪除失敗：' + e.message, 'error');
-    }
+    const btn = $('#ad-delete-all-users'); btn.disabled = true; btn.textContent = '刪除中...';
+    const { data: r } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
+    btn.disabled = false; btn.textContent = '🗑️ 刪除全部玩家帳號（完全清空）';
+    if (!r?.ok) return showToast('刪除失敗：' + (r?.error || '未知錯誤'), 'error');
+    showToast('✅ ' + r.msg);
+    await loadAdminData();
   };
   $('#ad-logout').onclick = () => { state.adminAuthed = false; state.adminPwd = ''; state.page = 'login'; render(); };
   $('#ad-save-regpwd').onclick = async () => {
