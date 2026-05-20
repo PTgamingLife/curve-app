@@ -3608,7 +3608,8 @@ function renderAdmin() {
           <label style="font-size:12px; color:var(--blue);">開始日期</label>
           <input id="ad-start" type="date" class="input-cyber" value="${state.config?.start_date || ''}" />
           <button class="btn-cyber" id="ad-save-start">儲存開始日期</button>
-          <button class="btn-primary" id="ad-reset" style="background:linear-gradient(135deg,#ff3d3d,#ff7c2a);">⚠️ 重置比賽（清除進度）</button>
+          <button class="btn-primary" id="ad-reset" style="background:linear-gradient(135deg,#ff3d3d,#ff7c2a);">⚠️ 重置比賽（清除進度，保留帳號）</button>
+          <button class="btn-primary" id="ad-delete-all-users" style="background:linear-gradient(135deg,#7b0000,#c0392b); margin-top:4px;">🗑️ 刪除全部玩家帳號（完全清空）</button>
         </div>
       </div>
 
@@ -3691,21 +3692,61 @@ function renderAdmin() {
     showToast('✓ 已更新開始日期');
     await loadConfig();
   };
-  // Risk 8: 重置比賽需手動輸入 "RESET" 確認，防止誤按
+  // Risk 8: 重置比賽 — 需輸入 RESET 兩次確認，同時清除 smr_users 所有進度欄位
   $('#ad-reset').onclick = async () => {
-    const typed = window.prompt('⚠️ 高危險操作！\n\n此操作將清除所有 150 位玩家的比賽進度（保留帳號）。\n\n請輸入 RESET 確認執行：');
-    if (typed !== 'RESET') return showToast('操作已取消（需輸入 RESET）', 'error');
-    const typed2 = window.prompt('⚠️ 最後確認！請再次輸入 RESET：');
+    const typed = window.prompt('⚠️ 高危險操作！\n\n清除所有玩家比賽進度（保留帳號/電話/姓名）。\n\n請輸入 RESET 確認：');
+    if (typed !== 'RESET') return showToast('操作已取消', 'error');
+    const typed2 = window.prompt('最後確認，再次輸入 RESET：');
     if (typed2 !== 'RESET') return showToast('操作已取消', 'error');
     try {
+      // 清除子表
       await sb.from('smr_body_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await sb.from('smr_quiz_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await sb.from('smr_meal_checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await sb.from('smr_badges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await sb.from('smr_users').update({ xp: 0, level: 1 }).neq('id', '00000000-0000-0000-0000-000000000000');
-      showToast('✓ 已重置比賽');
+      await sb.from('smr_friendships').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_pokes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_photo_likes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_leaderboard_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      // 重置 smr_users 所有進度欄位（保留帳號基本資料）
+      await sb.from('smr_users').update({
+        xp: 0, level: 1, ai_used: false,
+        ai_report: null,
+        face_photo_url: null, tongue_photo_url: null,
+        final_weight: null, final_body_fat_pct: null,
+        final_muscle_mass: null, final_visceral_fat: null,
+        final_weight_photo_url: null, final_submitted_at: null,
+      }).neq('id', '00000000-0000-0000-0000-000000000000');
+      showToast('✓ 已重置比賽（保留帳號）');
+      await loadAdminData();
     } catch (e) {
       showToast('重置失敗：' + e.message, 'error');
+    }
+  };
+
+  // 完全刪除所有玩家帳號（換屆用）
+  $('#ad-delete-all-users').onclick = async () => {
+    const typed = window.prompt('🔴 極度危險！\n\n這將刪除全部玩家帳號及所有資料，無法復原。\n下屆參賽者需重新報名。\n\n請輸入 DELETE ALL 確認：');
+    if (typed !== 'DELETE ALL') return showToast('操作已取消', 'error');
+    const typed2 = window.prompt('最後確認，再次輸入 DELETE ALL：');
+    if (typed2 !== 'DELETE ALL') return showToast('操作已取消', 'error');
+    try {
+      // 子表先刪（外鍵順序）
+      await sb.from('smr_body_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_quiz_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_meal_checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_badges').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_friendships').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_pokes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_photo_likes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_ai_queue').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await sb.from('smr_leaderboard_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      // 最後刪玩家帳號
+      await sb.from('smr_users').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      showToast('✅ 所有玩家帳號已刪除，可重新報名');
+      await loadAdminData();
+    } catch (e) {
+      showToast('刪除失敗：' + e.message, 'error');
     }
   };
   $('#ad-logout').onclick = () => { state.adminAuthed = false; state.adminPwd = ''; state.page = 'login'; render(); };
