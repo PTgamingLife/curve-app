@@ -582,6 +582,15 @@ const state = {
 // 8 個人物頭像：男女各 4，不同髮型/膚色
 const AVATARS = ['👨','👨‍🦱','👨‍🦰','👨‍🦳','👩','👩‍🦱','👩‍🦰','👩‍🦳'];
 
+const SECURITY_QUESTIONS = [
+  '您的小學班主任姓名？',
+  '您第一隻寵物的名字？',
+  '您母親的娘家姓氏？',
+  '您最喜歡的兒時食物？',
+  '您第一台手機的品牌？',
+  '您童年最好的朋友叫什麼名字？',
+];
+
 // 戳一下的「情緒勒索」訊息池
 const POKE_MESSAGES = [
   '快瘦下來吧！💪',
@@ -3331,12 +3340,12 @@ function renderLogin() {
             <input id="login-phone" class="input-cyber" type="tel" placeholder="09xxxxxxxx" />
           </div>
           <div>
-            <div style="font-size:13px; color:var(--blue); font-weight:700; margin-bottom:6px;">🔒 PIN 碼</div>
+            <div style="font-size:13px; color:var(--blue); font-weight:700; margin-bottom:6px;">🔒 密碼</div>
             <input id="login-pin" class="input-cyber" type="tel" maxlength="6"
               placeholder="4～6 位數字"
               style="letter-spacing:6px; font-size:20px;" />
             <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">
-              首次登入或忘記 PIN？留空後點登入，系統會引導您設定
+              首次登入？留空後點登入，系統會引導您設定密碼
             </div>
           </div>
           <button class="btn-primary" id="phone-submit" style="width:100%; margin-top:4px;">登入 →</button>
@@ -3351,30 +3360,42 @@ function renderLogin() {
     return;
   }
 
-  // 首次設定 PIN（舊玩家第一次登入強制設定）
+  // 首次設定密碼（舊玩家第一次登入強制設定，或通過安全問答後重設）
   if (step === 'set-pin') {
     const u = state.loginPending;
+    const qOpts = SECURITY_QUESTIONS.map((q,i) => `<option value="${q}" ${i===0?'selected':''}>${q}</option>`).join('');
     app.innerHTML = `
       <div class="flex-1 fade-in" style="display:flex; flex-direction:column; padding:40px 24px; min-height:100vh;">
         <div style="margin-top:40px; text-align:center;">
           <div style="font-size:48px;">${u?.avatar || '👤'}</div>
           <div class="font-display" style="font-size:22px; margin-top:8px;">${u?.name || ''}</div>
-          <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">請設定您的個人 PIN 碼</div>
+          <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">請設定您的個人密碼與安全問題</div>
           <div style="font-size:12px; color:var(--primary); margin-top:8px; background:var(--primary-l); border-radius:10px; padding:8px 16px; line-height:1.5;">
-            🔒 為保護帳戶安全，每次登入需要 PIN 碼<br>
+            🔒 為保護帳戶安全，每次登入需要密碼<br>
             請勿與他人分享
           </div>
         </div>
         <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
           <div>
-            <label style="font-size:13px; color:var(--blue); font-weight:700;">設定 PIN 碼（4～6 位數字）</label>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">設定密碼（4～6 位數字）</label>
             <input id="setpin-input" class="input-cyber mt-1" type="tel" maxlength="6"
               placeholder="請輸入數字" style="text-align:center; font-size:24px; letter-spacing:8px;" />
           </div>
           <div>
-            <label style="font-size:13px; color:var(--blue); font-weight:700;">再次確認 PIN</label>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">再次確認密碼</label>
             <input id="setpin-confirm" class="input-cyber mt-1" type="tel" maxlength="6"
               placeholder="再輸入一次" style="text-align:center; font-size:24px; letter-spacing:8px;" />
+          </div>
+          <div style="border-top:1px dashed var(--border); padding-top:12px; margin-top:4px;">
+            <div style="font-size:12px; color:var(--ink-soft); margin-bottom:8px;">🛡️ 安全問題（忘記密碼時用於驗證身份）</div>
+            <div>
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">選擇問題</label>
+              <select id="setpin-question" class="input-cyber mt-1" style="width:100%; appearance:auto;">${qOpts}</select>
+            </div>
+            <div style="margin-top:8px;">
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">您的答案</label>
+              <input id="setpin-answer" class="input-cyber mt-1" placeholder="請輸入答案（不區分大小寫）" />
+            </div>
           </div>
           <button class="btn-primary" id="setpin-submit" style="margin-top:8px;">確認設定 · 進入 APP</button>
         </div>
@@ -3383,15 +3404,81 @@ function renderLogin() {
     $('#setpin-submit').onclick = async () => {
       const pin = $('#setpin-input').value.trim();
       const confirm = $('#setpin-confirm').value.trim();
-      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('PIN 碼需為 4～6 位數字', 'error');
-      if (pin !== confirm) return showToast('兩次 PIN 碼不一致', 'error');
+      const question = $('#setpin-question').value;
+      const answer = $('#setpin-answer').value.trim();
+      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('密碼需為 4～6 位數字', 'error');
+      if (pin !== confirm) return showToast('兩次密碼不一致', 'error');
+      if (!answer) return showToast('請輸入安全問題答案', 'error');
       const btn = $('#setpin-submit');
       btn.disabled = true; btn.textContent = '設定中...';
       await sb.rpc('smr_set_user_pin', { p_user_id: u.id, p_pin: pin });
+      await sb.rpc('smr_set_security_qa', { p_user_id: u.id, p_question: question, p_answer: answer });
       state.loginPending = null;
-      showToast('🔒 PIN 碼設定完成！');
+      showToast('🔒 密碼設定完成！');
       await completeLogin(u);
     };
+    return;
+  }
+
+  // 密碼錯誤 → 安全問答驗證後重設密碼
+  if (step === 'reset-password') {
+    const u = state.loginPending;
+    app.innerHTML = `
+      <div class="flex-1 fade-in" style="display:flex; flex-direction:column; padding:40px 24px; min-height:100vh;">
+        <button id="back-btn" style="background:none; border:none; color:var(--blue); cursor:pointer; font-family:inherit; text-align:left;">‹ 返回登入</button>
+        <div style="margin-top:24px; text-align:center;">
+          <div style="font-size:48px;">${u?.avatar || '🔑'}</div>
+          <div class="font-display" style="font-size:20px; margin-top:8px;">${u?.name || ''}</div>
+          <div style="font-size:14px; color:var(--primary); font-weight:700; margin-top:8px;">密碼錯誤</div>
+          <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">請回答安全問題以重設密碼</div>
+        </div>
+        <div style="margin-top:28px; display:flex; flex-direction:column; gap:14px; background:var(--primary-l); border-radius:14px; padding:16px;">
+          <div id="security-q-loading" style="text-align:center; color:var(--ink-soft); font-size:13px;">載入問題中...</div>
+          <div id="security-q-section" style="display:none;">
+            <div style="font-size:13px; font-weight:700; color:var(--ink); margin-bottom:4px;">問題：</div>
+            <div id="security-q-text" style="font-size:14px; color:var(--primary); font-weight:700; background:white; border-radius:10px; padding:10px 12px; line-height:1.5;"></div>
+            <div style="margin-top:12px;">
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">您的答案</label>
+              <input id="reset-answer" class="input-cyber mt-1" placeholder="請輸入答案" />
+            </div>
+            <button class="btn-primary" id="reset-submit" style="margin-top:12px; width:100%;">驗證並重設密碼 →</button>
+          </div>
+          <div id="security-q-error" style="display:none; text-align:center; color:var(--primary); font-size:13px;">
+            無法載入安全問題，請聯絡主辦單位
+          </div>
+        </div>
+      </div>
+    `;
+    $('#back-btn').onclick = () => { state.loginStep = 'phone'; state.loginPending = null; render(); };
+    // 載入安全問題
+    (async () => {
+      const { data: qData } = await sb.rpc('smr_get_security_question', { p_user_id: u.id });
+      const question = Array.isArray(qData) ? qData[0]?.security_question : qData?.security_question;
+      $('#security-q-loading').style.display = 'none';
+      if (question) {
+        $('#security-q-text').textContent = question;
+        $('#security-q-section').style.display = 'block';
+      } else {
+        $('#security-q-error').style.display = 'block';
+      }
+    })();
+    $('#reset-submit')?.addEventListener('click', async () => {
+      const answer = $('#reset-answer')?.value.trim();
+      if (!answer) return showToast('請輸入答案', 'error');
+      const btn = $('#reset-submit');
+      btn.disabled = true; btn.textContent = '驗證中...';
+      const { data: ok } = await sb.rpc('smr_verify_and_reset_password', { p_user_id: u.id, p_answer: answer });
+      if (ok) {
+        showToast('✓ 驗證成功，請設定新密碼');
+        state.loginStep = 'set-pin';
+        render();
+      } else {
+        showToast('答案不正確，請再試一次', 'error');
+        btn.disabled = false; btn.textContent = '驗證並重設密碼 →';
+        $('#reset-answer').value = '';
+        $('#reset-answer').focus();
+      }
+    });
     return;
   }
 
@@ -3438,10 +3525,24 @@ function renderLogin() {
           </div>
 
           <div>
-            <label style="font-size:13px; color:var(--primary); font-weight:700;">🔒 設定個人 PIN 碼（必填）</label>
+            <label style="font-size:13px; color:var(--primary); font-weight:700;">🔒 設定個人密碼（必填）</label>
             <input id="reg-pin" class="input-cyber mt-1" type="tel" maxlength="6" placeholder="4～6 位數字" />
             <div style="font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.4;">
               往後每次登入需要輸入，請勿與他人分享
+            </div>
+          </div>
+
+          <div style="border-top:1px dashed var(--border); padding-top:12px;">
+            <div style="font-size:12px; color:var(--ink-soft); margin-bottom:8px;">🛡️ 安全問題（忘記密碼時用於驗證身份，必填）</div>
+            <div>
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">選擇問題</label>
+              <select id="reg-sec-q" class="input-cyber mt-1" style="width:100%; appearance:auto;">
+                ${SECURITY_QUESTIONS.map((q,i) => `<option value="${q}" ${i===0?'selected':''}>${q}</option>`).join('')}
+              </select>
+            </div>
+            <div style="margin-top:8px;">
+              <label style="font-size:13px; color:var(--blue); font-weight:700;">您的答案</label>
+              <input id="reg-sec-a" class="input-cyber mt-1" placeholder="請輸入答案（不區分大小寫）" />
             </div>
           </div>
 
@@ -3504,12 +3605,15 @@ function renderLogin() {
       const birthdate = $('#reg-birthdate').value;
       const gender = $('#reg-gender').value;
       const pin = $('#reg-pin').value.trim();
+      const secQ = $('#reg-sec-q').value;
+      const secA = $('#reg-sec-a').value.trim();
       const consent = $('#reg-consent').checked;
       if (!name) return showToast('請輸入姓名', 'error');
       if (!pwd) return showToast('請輸入報名密碼', 'error');
       if (!birthdate) return showToast('請選擇生日', 'error');
       if (!gender) return showToast('請選擇性別', 'error');
-      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('請設定 4～6 位數字 PIN 碼', 'error');
+      if (!pin || pin.length < 4 || !/^\d+$/.test(pin)) return showToast('請設定 4～6 位數字密碼', 'error');
+      if (!secA) return showToast('請輸入安全問題答案', 'error');
       if (!consent) return showToast('請閱讀並勾選隱私同意', 'error');
       if (!weightPhotoFile) return showToast('請上傳開賽前體重照片', 'error');
 
@@ -3524,8 +3628,9 @@ function renderLogin() {
         const newUser = await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
         if (newUser?.id) {
           await sb.rpc('smr_set_user_pin', { p_user_id: newUser.id, p_pin: pin });
+          await sb.rpc('smr_set_security_qa', { p_user_id: newUser.id, p_question: secQ, p_answer: secA });
         }
-        showToast('🎉 歡迎加入！PIN 碼已設定');
+        showToast('🎉 歡迎加入！密碼已設定');
         state.page = 'home'; render();
         ensureCleanupFresh();
       } catch (e) {
@@ -3560,18 +3665,18 @@ async function handlePhoneSubmit() {
     return;
   }
 
-  // 已有 PIN：直接在同一畫面驗證
-  if (!pin) return showToast('請輸入 PIN 碼', 'error');
+  // 已有密碼：直接在同一畫面驗證
+  if (!pin) return showToast('請輸入密碼', 'error');
   const btn = $('#phone-submit');
   btn.disabled = true; btn.textContent = '驗證中...';
   const { data: ok } = await sb.rpc('smr_verify_user_pin', { p_user_id: existing.id, p_pin: pin });
   if (ok) {
     await completeLogin(existing);
   } else {
-    showToast('PIN 碼錯誤，請再試一次', 'error');
-    btn.disabled = false; btn.textContent = '登入 →';
-    $('#login-pin').value = '';
-    $('#login-pin').focus();
+    // 密碼錯誤 → 需通過安全問答才能重填
+    state.loginPending = existing;
+    state.loginStep = 'reset-password';
+    render();
   }
 }
 
@@ -3742,6 +3847,13 @@ function renderAdmin() {
     btn.disabled = false; btn.textContent = '⚠️ 重置比賽（清除進度，保留帳號）';
     if (!r?.ok) return showToast('重置失敗：' + (r?.error || '未知錯誤'), 'error');
     showToast('✓ ' + r.msg);
+    // 重設前端狀態，避免舊資料殘留
+    await loadConfig();
+    state.user = null;
+    state.friends = [];
+    state.checkins = [];
+    state.userXP = 0;
+    localStorage.removeItem('smr_phone');
     await loadAdminData();
   };
 
