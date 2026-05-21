@@ -230,13 +230,17 @@ body::before {
 
 /* Toast */
 .toast {
-  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
   background: var(--bg-soft);
   border: 1.5px solid var(--primary);
   color: var(--ink); padding: 12px 20px; border-radius: 999px;
   z-index: 999; font-weight: 700;
   box-shadow: 0 6px 20px rgba(255,107,107,0.18), 0 2px 6px rgba(0,0,0,0.06);
-  animation: slide-up 0.3s ease;
+  animation: toast-pop 0.25s ease;
+}
+@keyframes toast-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 .toast.error { border-color: #FF6B6B; color: #C92A2A; }
 .toast.success { border-color: #4ECDC4; color: #1B7A75; }
@@ -3843,9 +3847,9 @@ function renderAdmin() {
     const typed2 = window.prompt('最後確認，再次輸入 RESET：');
     if (typed2 !== 'RESET') return showToast('操作已取消', 'error');
     const btn = $('#ad-reset'); btn.disabled = true; btn.textContent = '重置中...';
-    const { data: r } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
+    const { data: r, error: rpcErr } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
     btn.disabled = false; btn.textContent = '⚠️ 重置比賽（清除進度，保留帳號）';
-    if (!r?.ok) return showToast('重置失敗：' + (r?.error || '未知錯誤'), 'error');
+    if (rpcErr || !r?.ok) return showToast('重置失敗：' + (r?.error || rpcErr?.message || '未知錯誤'), 'error');
     showToast('✓ ' + r.msg);
     // 重設前端狀態，避免舊資料殘留
     await loadConfig();
@@ -3864,9 +3868,9 @@ function renderAdmin() {
     const typed2 = window.prompt('最後確認，再次輸入 DELETE ALL：');
     if (typed2 !== 'DELETE ALL') return showToast('操作已取消', 'error');
     const btn = $('#ad-delete-all-users'); btn.disabled = true; btn.textContent = '刪除中...';
-    const { data: r } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
+    const { data: r, error: rpcErr } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
     btn.disabled = false; btn.textContent = '🗑️ 刪除全部玩家帳號（完全清空）';
-    if (!r?.ok) return showToast('刪除失敗：' + (r?.error || '未知錯誤'), 'error');
+    if (rpcErr || !r?.ok) return showToast('刪除失敗：' + (r?.error || rpcErr?.message || '未知錯誤'), 'error');
     showToast('✅ ' + r.msg);
     await loadAdminData();
   };
