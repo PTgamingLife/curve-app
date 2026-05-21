@@ -3843,9 +3843,9 @@ function renderAdmin() {
     const typed2 = window.prompt('最後確認，再次輸入 RESET：');
     if (typed2 !== 'RESET') return showToast('操作已取消', 'error');
     const btn = $('#ad-reset'); btn.disabled = true; btn.textContent = '重置中...';
-    const { data: r } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
+    const { data: r, error: rpcErr } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
     btn.disabled = false; btn.textContent = '⚠️ 重置比賽（清除進度，保留帳號）';
-    if (!r?.ok) return showToast('重置失敗：' + (r?.error || '未知錯誤'), 'error');
+    if (rpcErr || !r?.ok) return showToast('重置失敗：' + (r?.error || rpcErr?.message || '未知錯誤'), 'error');
     showToast('✓ ' + r.msg);
     // 重設前端狀態，避免舊資料殘留
     await loadConfig();
@@ -3864,9 +3864,9 @@ function renderAdmin() {
     const typed2 = window.prompt('最後確認，再次輸入 DELETE ALL：');
     if (typed2 !== 'DELETE ALL') return showToast('操作已取消', 'error');
     const btn = $('#ad-delete-all-users'); btn.disabled = true; btn.textContent = '刪除中...';
-    const { data: r } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
+    const { data: r, error: rpcErr } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
     btn.disabled = false; btn.textContent = '🗑️ 刪除全部玩家帳號（完全清空）';
-    if (!r?.ok) return showToast('刪除失敗：' + (r?.error || '未知錯誤'), 'error');
+    if (rpcErr || !r?.ok) return showToast('刪除失敗：' + (r?.error || rpcErr?.message || '未知錯誤'), 'error');
     showToast('✅ ' + r.msg);
     await loadAdminData();
   };
