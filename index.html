@@ -1888,18 +1888,14 @@ async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
     transitionToProcessing();
     const report = await callClaudeAI(facePhoto, tonguePhoto, form);
 
-    // save to user
+    // save to user — 只存報告結果，照片僅在記憶體中使用後即丟棄
     await sb.from('smr_users').update({
       ai_used: true,
       ai_report: report,
-      face_photo_url: facePhoto,
-      tongue_photo_url: tonguePhoto,
     }).eq('id', state.user.id);
 
     state.user.ai_used = true;
     state.user.ai_report = report;
-    state.user.face_photo_url = facePhoto;
-    state.user.tongue_photo_url = tonguePhoto;
 
     // also save body record
     const rec = {
