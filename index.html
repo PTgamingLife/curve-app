@@ -984,7 +984,7 @@ async function loadPhotoWall(forceRefresh = false) {
     .eq('checkin_date', day)
     .not('photo_url', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(100); // 每天最多顯示 100 張，避免尖峰流量過高
+    .limit(600); // 200 人 × 3 餐 = 600 張上限
 
   if (!checkins?.length) { _photoWallCache = []; return []; }
 
@@ -4302,12 +4302,12 @@ function attachListeners() {
         $('#lunch-confirm').onclick = async () => {
           const btn = $('#lunch-confirm');
           btn.disabled = true;
-          btn.textContent = '上傳中...';
+          btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>上傳中，請稍候...';
           try {
             const { photoUrl, thumbUrl } = await uploadPhotoWithThumb(lunchFile, state.user.id);
             await checkIn('lunch', photoUrl, thumbUrl);
           } catch (err) {
-            showToast(err.message || '上傳失敗', 'error');
+            showToast(err.message || '上傳失敗，請重試', 'error');
             btn.disabled = false;
             btn.textContent = '✓ 確認打卡';
           }
