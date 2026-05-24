@@ -1453,18 +1453,28 @@ async function loadPokesReceivedToday() {
 
 async function checkUnseenPokes() {
   if (!state.user) return;
-  const { data: pokes } = await sb.from('smr_pokes')
-    .select('id, message, poke_date, poker:poker_id(name, avatar)')
+
+  // 1. 取未讀戳
+  const { data: pokes, error } = await sb.from('smr_pokes')
+    .select('id, poker_id, message, poke_date')
     .eq('poked_id', state.user.id)
     .is('seen_at', null)
     .order('created_at', { ascending: false });
-  if (!pokes?.length) return;
+  if (error || !pokes?.length) return;
 
+  // 2. 取發送者資訊（兩段查詢，不依賴 FK join）
+  const pokerIds = [...new Set(pokes.map(p => p.poker_id))];
+  const { data: pokers } = await sb.from('smr_users')
+    .select('id, name, avatar').in('id', pokerIds);
+  const pokerMap = Object.fromEntries((pokers || []).map(u => [u.id, u]));
+
+  // 3. 標記為已讀
   await sb.from('smr_pokes')
     .update({ seen_at: new Date().toISOString() })
     .eq('poked_id', state.user.id)
     .is('seen_at', null);
 
+  // 4. 顯示彈跳窗
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px;';
   modal.innerHTML = `
@@ -1473,13 +1483,15 @@ async function checkUnseenPokes() {
       <div class="font-display glow-orange" style="font-size:20px; text-align:center; margin-bottom:4px;">有人戳了你！</div>
       <div style="font-size:12px; color:var(--ink-soft); text-align:center; margin-bottom:14px;">收到 ${pokes.length} 則戳訊息</div>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
-        ${pokes.map(p => `
+        ${pokes.map(p => {
+          const sender = pokerMap[p.poker_id] || {};
+          return `
           <div style="background:var(--primary-l); border-radius:12px; padding:10px 14px; border:1px solid rgba(255,107,107,0.2);">
-            <div style="font-weight:700; font-size:14px; margin-bottom:4px;">${p.poker?.avatar || '👤'} ${p.poker?.name || '神秘人'}</div>
+            <div style="font-weight:700; font-size:14px; margin-bottom:4px;">${sender.avatar || '👤'} ${sender.name || '神秘人'}</div>
             <div style="font-size:13px; color:var(--ink);">${p.message}</div>
             <div style="font-size:10px; color:var(--ink-soft); margin-top:4px;">${p.poke_date}</div>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
       <button id="poke-notif-close" class="btn-primary" style="width:100%;">收到了！繼續加油 💪</button>
     </div>
