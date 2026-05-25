@@ -604,23 +604,23 @@ const POKE_MESSAGES = [
 ];
 
 const NO_POKE_PHRASES = [
-  '今天還沒人戳你，可能大家都太忙了…',
-  '咦？今天好安靜，要不要主動戳一下朋友？',
-  '0 人戳你 — 可能是因為你太棒了，沒人需要督促你！⭐',
-  '今天平靜的一天，繼續努力！💪',
+  '28天賽程中還沒人戳你，可能大家都太忙了…',
+  '咦？賽程好安靜，要不要主動戳一下朋友？',
+  '0 戳紀錄 — 可能是因為你太棒了，沒人需要督促你！⭐',
+  '保持節奏，繼續努力！💪',
 ];
 
 const FEW_POKE_PHRASES = (n) => [
-  `${n} 個人在關心你的進度，別讓他們失望喔！`,
-  `今天 ${n} 個人戳你，這是溫柔的提醒～`,
-  `來自 ${n} 位朋友的關注，加油💪`,
+  `累積 ${n} 次關心，大家一直在看你的進度喔！`,
+  `28天共 ${n} 次被戳，這是朋友們的溫柔督促～`,
+  `來自朋友的累積 ${n} 次關注，別讓他們失望💪`,
 ];
 
 const MANY_POKE_PHRASES = (n) => [
-  `哇！${n} 個人在關心你！是時候動起來了 🔥`,
-  `${n} 個朋友期待看到你瘦下來，加油！`,
-  `${n} 戳！大家都很關心你，今天一定要打卡 ⚡`,
-  `${n} 人在催促你，今天要不要直接跑兩圈？🏃`,
+  `哇！28天累積 ${n} 次被戳！是時候加速了 🔥`,
+  `累積 ${n} 戳！朋友們一直期待看到你瘦下來！`,
+  `${n} 次累積！28天大家都很關心你，繼續打卡 ⚡`,
+  `累積 ${n} 戳！賽程結束前衝刺最後幾步！🏃`,
 ];
 const BADGE_NAMES = [
   ['啟程鬥士','🚀'],['晨光勇者','🌅'],['三日堅持','💎'],['飲食達人','🥗'],
@@ -1282,7 +1282,7 @@ function openPokeModal(friendId, friendName) {
 async function renderPokesCard() {
   const wrap = document.getElementById('pokes-card');
   if (!wrap) return;
-  const pokes = await loadPokesReceivedToday();
+  const pokes = await loadPokesReceived28Days();
   const n = pokes.length;
 
   let phrase, accent, icon;
@@ -1307,7 +1307,7 @@ async function renderPokesCard() {
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="font-size:36px;">${icon}</div>
         <div style="flex:1;">
-          <div style="font-size:11px; color:${accent}; font-weight:900; letter-spacing:1px;">今日被戳</div>
+          <div style="font-size:11px; color:${accent}; font-weight:900; letter-spacing:1px;">28天累積被戳</div>
           <div class="font-display" style="font-size:32px; line-height:1; color:var(--ink);">${n} <span style="font-size:14px;">次</span></div>
         </div>
       </div>
@@ -1422,11 +1422,14 @@ async function pokeFriend(friendId, message) {
   await addXP(3);
 }
 
-async function loadPokesReceivedToday() {
+async function loadPokesReceived28Days() {
   if (!state.user) return [];
-  const { data } = await sb.from('smr_pokes')
-    .select('*').eq('poked_id', state.user.id).eq('poke_date', today())
-    .order('created_at', { ascending: false });
+  let query = sb.from('smr_pokes')
+    .select('*').eq('poked_id', state.user.id);
+  if (state.config?.start_date) {
+    query = query.gte('poke_date', state.config.start_date);
+  }
+  const { data } = await query.order('created_at', { ascending: false });
   return data || [];
 }
 
