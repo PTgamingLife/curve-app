@@ -1869,6 +1869,8 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
   }
 }
 
+let _aiStatusInterval = null;
+
 async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
   if (state.user.ai_used) return showToast('每帳號限用一次 AI 分析', 'error');
 
@@ -1927,6 +1929,7 @@ async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
     // 4. 標記完成
     if (queueId) await sb.from('smr_ai_queue').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', queueId);
 
+    clearInterval(_aiStatusInterval); _aiStatusInterval = null;
     sfx.levelup();
     document.getElementById('ai-overlay')?.remove();
     showToast('🎉 AI 完整分析完成！');
@@ -1934,6 +1937,7 @@ async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
     render();
   } catch (e) {
     if (queueId) await sb.from('smr_ai_queue').update({ status: 'failed', completed_at: new Date().toISOString() }).eq('id', queueId);
+    clearInterval(_aiStatusInterval); _aiStatusInterval = null;
     document.getElementById('ai-overlay')?.remove();
     showToast(e.message || 'AI 分析失敗', 'error');
   }
@@ -2133,9 +2137,33 @@ function transitionToProcessing() {
   setTimeout(() => {
     info.innerHTML = `
       <div class="font-display glow-orange" style="font-size:28px;">🔬 ANALYZING</div>
-      <div style="font-size:13px; color:var(--ink); margin-top:4px;">AI 正在掃描中...</div>
-      <div id="ai-status" style="margin-top:8px; min-height:40px;"></div>
+      <div id="ai-status" style="margin-top:14px; min-height:56px; text-align:center;"></div>
     `;
+
+    const steps = [
+      { icon: '🔍', text: '掃描面部輪廓中...' },
+      { icon: '👅', text: '分析舌苔特徵中...' },
+      { icon: '⚖️', text: '計算體組成數據...' },
+      { icon: '🏥', text: '評估五臟六腑狀態...' },
+      { icon: '🌿', text: '生成中醫養生建議...' },
+      { icon: '💰', text: '推算五行財運分析...' },
+      { icon: '📊', text: '整合個人健康報告...' },
+      { icon: '✨', text: '即將完成，請稍候...' },
+    ];
+    let stepIdx = 0;
+
+    const showStep = () => {
+      const el = document.getElementById('ai-status');
+      if (!el) return;
+      const s = steps[stepIdx % steps.length];
+      el.innerHTML = `
+        <div style="font-size:26px; margin-bottom:6px;">${s.icon}</div>
+        <div style="font-size:14px; color:var(--ink); font-weight:600;">${s.text}</div>
+      `;
+      stepIdx++;
+    };
+    showStep();
+    _aiStatusInterval = setInterval(showStep, 3500);
   }, 1400);
 }
 
