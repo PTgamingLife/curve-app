@@ -230,13 +230,17 @@ body::before {
 
 /* Toast */
 .toast {
-  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
   background: var(--bg-soft);
   border: 1.5px solid var(--primary);
   color: var(--ink); padding: 12px 20px; border-radius: 999px;
   z-index: 999; font-weight: 700;
   box-shadow: 0 6px 20px rgba(255,107,107,0.18), 0 2px 6px rgba(0,0,0,0.06);
-  animation: slide-up 0.3s ease;
+  animation: toast-pop 0.25s ease;
+}
+@keyframes toast-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 .toast.error { border-color: #FF6B6B; color: #C92A2A; }
 .toast.success { border-color: #4ECDC4; color: #1B7A75; }
@@ -577,6 +581,9 @@ const state = {
   rankTab: 'fat',
   recordTab: 'chart',
   quizState: null, // { day, options, selected, answered, correct }
+  pokesReceived: [],
+  pokeIndex: 0,
+  pokeMap: {},
 };
 
 // 8 個人物頭像：男女各 4，不同髮型/膚色
@@ -838,6 +845,22 @@ async function uploadPhotoWithThumb(file, userId) {
   ]);
   return { photoUrl, thumbUrl };
 }
+function showUploadingModal(msg = '上傳中，請稍候...') {
+  document.getElementById('uploading-modal')?.remove();
+  const el = document.createElement('div');
+  el.id = 'uploading-modal';
+  el.style.cssText = 'position:fixed; inset:0; z-index:2000; background:rgba(45,49,66,0.5); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:24px;';
+  el.innerHTML = `
+    <div class="card-cyber fade-in" style="max-width:280px; width:100%; text-align:center; padding:28px 24px;">
+      <div class="spinner" style="width:40px; height:40px; border-width:4px; margin:0 auto 16px;"></div>
+      <div style="font-weight:700; font-size:15px;">${msg}</div>
+      <div style="font-size:12px; color:var(--ink-soft); margin-top:6px;">請勿關閉或重新整理頁面</div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  return () => el.remove();
+}
+
 function showToast(msg, type = 'success') {
   const div = document.createElement('div');
   div.className = `toast ${type}`;
@@ -980,7 +1003,7 @@ async function loadPhotoWall(forceRefresh = false) {
     .eq('checkin_date', day)
     .not('photo_url', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(100); // 每天最多顯示 100 張，避免尖峰流量過高
+    .limit(600); // 200 人 × 3 餐 = 600 張上限
 
   if (!checkins?.length) { _photoWallCache = []; return []; }
 
@@ -1114,10 +1137,10 @@ function openFinalVerificationModal() {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd);
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.textContent = '上傳照片中...';
+    btn.disabled = true;
+    const hideFinalModal = showUploadingModal('🏆 上傳體重照片中...');
     try {
       const { photoUrl } = await uploadPhotoWithThumb(photoFile, `final/${state.user.id}`);
-      btn.textContent = '結算中...';
       await sb.from('smr_users').update({
         final_weight: parseFloat(data.weight),
         final_body_fat_pct: parseFloat(data.body_fat),
@@ -1127,7 +1150,6 @@ function openFinalVerificationModal() {
         final_submitted_at: new Date().toISOString(),
       }).eq('id', state.user.id);
 
-      // 更新本地 state
       Object.assign(state.user, {
         final_weight: parseFloat(data.weight),
         final_body_fat_pct: parseFloat(data.body_fat),
@@ -1137,12 +1159,14 @@ function openFinalVerificationModal() {
         final_submitted_at: new Date().toISOString(),
       });
 
+      hideFinalModal();
       sfx.levelup();
       showToast('🏆 結算完成！感謝參賽');
       await addXP(100);
       modal.remove();
       render();
     } catch (err) {
+      hideFinalModal();
       btn.disabled = false; btn.textContent = '🏆 提交最終結算';
       showToast(err.message || '結算失敗', 'error');
     }
@@ -1279,41 +1303,70 @@ function openPokeModal(friendId, friendName) {
   });
 }
 
-async function renderPokesCard() {
-  const wrap = document.getElementById('pokes-card');
+async function renderPokeCycleCard() {
+  const wrap = document.getElementById('poke-cycle-card');
   if (!wrap) return;
-  const pokes = await loadPokesReceivedToday();
-  const n = pokes.length;
 
-  let phrase, accent, icon;
-  if (n === 0) {
-    phrase = NO_POKE_PHRASES[Math.floor(Math.random()*NO_POKE_PHRASES.length)];
-    accent = 'var(--mint)'; icon = '🤔';
-  } else if (n < 3) {
-    phrase = FEW_POKE_PHRASES(n)[Math.floor(Math.random()*3)];
-    accent = 'var(--sun)'; icon = '👉';
-  } else {
-    phrase = MANY_POKE_PHRASES(n)[Math.floor(Math.random()*4)];
-    accent = 'var(--primary)'; icon = '🔥';
+  const { data: pokes } = await sb.from('smr_pokes')
+    .select('id, poker_id, message, poke_date')
+    .eq('poked_id', state.user.id)
+    .order('created_at', { ascending: false });
+
+  state.pokesReceived = pokes || [];
+  state.pokeIndex = 0;
+
+  if (!state.pokesReceived.length) {
+    wrap.innerHTML = `
+      <div style="background:var(--bg-soft); border:2px solid var(--border); border-radius:18px; padding:16px; text-align:center;">
+        <div style="font-size:28px; margin-bottom:6px;">👤</div>
+        <div style="font-size:14px; color:var(--ink-soft);">還沒有人戳你</div>
+      </div>
+    `;
+    return;
   }
 
+  const pokerIds = [...new Set(state.pokesReceived.map(p => p.poker_id))];
+  const { data: pokers } = await sb.from('smr_users').select('id, name, avatar').in('id', pokerIds);
+  state.pokeMap = Object.fromEntries((pokers || []).map(u => [u.id, u]));
+
+  _renderPokeCard(wrap);
+}
+
+function _renderPokeCard(wrap) {
+  const pokes = state.pokesReceived;
+  const idx = state.pokeIndex;
+  const p = pokes[idx];
+  const sender = state.pokeMap[p.poker_id] || {};
+  const total = pokes.length;
+
   wrap.innerHTML = `
-    <div style="
-      background:linear-gradient(135deg, ${n>=3?'var(--primary-l)':n>0?'var(--sun-l)':'var(--mint-l)'}, var(--bg-soft));
-      border:2px solid ${accent};
-      border-radius:18px; padding:14px 16px;
-      box-shadow:0 4px 16px rgba(45,49,66,0.06);
+    <div id="poke-cycle-inner" style="
+      background:linear-gradient(135deg, var(--primary-l), var(--bg-soft));
+      border:2px solid var(--primary);
+      border-radius:18px; padding:14px 16px; cursor:pointer;
+      box-shadow:0 4px 16px rgba(255,107,107,0.1);
+      user-select:none;
     ">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div style="font-size:36px;">${icon}</div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <div style="font-size:28px;">${sender.avatar || '👤'}</div>
         <div style="flex:1;">
-          <div style="font-size:11px; color:${accent}; font-weight:900; letter-spacing:1px;">今日被戳</div>
-          <div class="font-display" style="font-size:32px; line-height:1; color:var(--ink);">${n} <span style="font-size:14px;">次</span></div>
+          <div style="font-size:11px; color:var(--primary); font-weight:900; letter-spacing:1px;">👉 戳了你！</div>
+          <div style="font-weight:700; font-size:15px; color:var(--ink);">${sender.name || '神秘人'}</div>
+        </div>
+        <div style="font-size:11px; color:var(--ink-soft); text-align:right; line-height:1.6;">
+          ${idx + 1} / ${total}<br>
+          <span style="color:var(--primary); font-weight:700;">點擊看下一則 →</span>
         </div>
       </div>
-      <div style="margin-top:8px; font-size:13px; line-height:1.5; color:var(--ink);">${phrase}</div>
+      <div style="font-size:14px; color:var(--ink); line-height:1.5; background:rgba(255,107,107,0.06); border-radius:10px; padding:8px 12px;">${p.message}</div>
+      <div style="font-size:10px; color:var(--ink-soft); margin-top:6px; text-align:right;">${p.poke_date}</div>
     </div>
   `;
+
+  wrap.querySelector('#poke-cycle-inner').onclick = () => {
+    state.pokeIndex = (idx + 1) % total;
+    _renderPokeCard(wrap);
+  };
 }
 
 async function updateHomeHearts() {
@@ -1429,6 +1482,7 @@ async function loadPokesReceivedToday() {
     .order('created_at', { ascending: false });
   return data || [];
 }
+
 
 async function loadMyHeartsToday() {
   // 今天我的照片收到幾個愛心
@@ -1846,18 +1900,14 @@ async function runFullAIAnalysis(form, facePhoto, tonguePhoto) {
     transitionToProcessing();
     const report = await callClaudeAI(facePhoto, tonguePhoto, form);
 
-    // save to user
+    // save to user — 只存報告結果，照片僅在記憶體中使用後即丟棄
     await sb.from('smr_users').update({
       ai_used: true,
       ai_report: report,
-      face_photo_url: facePhoto,
-      tongue_photo_url: tonguePhoto,
     }).eq('id', state.user.id);
 
     state.user.ai_used = true;
     state.user.ai_report = report;
-    state.user.face_photo_url = facePhoto;
-    state.user.tongue_photo_url = tonguePhoto;
 
     // also save body record
     const rec = {
@@ -2210,10 +2260,7 @@ const pages = {
       </div>
     </div>
 
-    <div class="card-orange mx-4 mt-3" style="padding:12px 16px;">
-      <div style="font-size:11px; color:var(--orange); font-weight:700;">🌍 全隊減碳</div>
-      <div class="font-display" style="font-size:24px; color:var(--ink);">~${(checkinDays * 2.5).toFixed(1)} kg CO₂</div>
-    </div>
+    <div id="poke-cycle-card" class="px-4 mt-3"></div>
 
     <!-- 結賽驗證狀態（第 28 天起顯示）-->
     ${isCompetitionEnded() ? `
@@ -2246,9 +2293,6 @@ const pages = {
         `}
       </div>
     ` : ''}
-
-    <!-- 戳一下：今日被戳次數 -->
-    <div id="pokes-card" class="px-4 mt-3"></div>
 
     <!-- 好友 3 格 -->
     <div class="px-4 mt-3">
@@ -2346,39 +2390,16 @@ const pages = {
       `;
     }
 
-    // === 已用過 AI 但今天還沒記錄 → 顯示之前 AI 報告 + 輸入今日數據 ===
+    // === 已用過 AI 但今天還沒記錄 → 只顯示 AI 報告（輸入表單在「紀錄」頁趨勢圖下方）===
     if (!todayRec && aiUsed && aiReport) {
       return `
       <div style="padding:20px 16px;">
         <h1 class="font-display glow-orange" style="font-size:28px;">BODY DATA</h1>
-        <div class="font-handwrite glow-blue" style="font-size:18px;">📋 之前的 AI 報告 + 輸入今日數據</div>
+        <div class="font-handwrite glow-blue" style="font-size:18px;">查看 AI 分析報告</div>
       </div>
       ${aiReportCard(aiReport)}
-      <div style="padding:0 16px; margin-top:12px;">
-        <div class="font-display glow-blue" style="font-size:18px; text-align:center; margin-bottom:8px;">📊 輸入今日身體數據</div>
-      </div>
-      <div class="px-4">
-        <div class="card-cyber">
-          <form id="body-form" style="display:flex; flex-direction:column; gap:14px;">
-            <div>
-              <label style="font-size:13px; color:var(--blue); font-weight:700;">⚖️ 體重 (kg)</label>
-              <input class="input-cyber mt-1" name="weight" type="number" step="0.1" placeholder="例：65.5" required />
-            </div>
-            <div>
-              <label style="font-size:13px; color:var(--orange); font-weight:700;">🔥 體脂肪 (%)</label>
-              <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：22.5" required />
-            </div>
-            <div>
-              <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (kg)</label>
-              <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.0" required />
-            </div>
-            <div>
-              <label style="font-size:13px; color:#ffd166; font-weight:700;">🍔 內臟脂肪 (1-20)</label>
-              <input class="input-cyber mt-1" name="visceral" type="number" min="1" max="20" placeholder="例：6" required />
-            </div>
-            <button type="submit" class="btn-primary">送出今日數據</button>
-          </form>
-        </div>
+      <div style="text-align:center; padding:12px 16px 20px; color:var(--ink-soft); font-size:13px;">
+        📋 前往「紀錄」頁可輸入今日數據
       </div>
       `;
     }
@@ -2458,6 +2479,7 @@ const pages = {
   },
 
   records: () => {
+    const todayRec = state.bodyRecords.find(r => r.recorded_date === today());
     return `
     <div style="padding:20px 16px;">
       <h1 class="font-display glow-orange" style="font-size:28px;">RECORDS</h1>
@@ -2473,6 +2495,34 @@ const pages = {
     <div class="px-4 mt-4">
       ${state.recordTab === 'chart' ? renderChart() : renderReportList()}
     </div>
+    ${state.recordTab === 'chart' && !todayRec ? `
+    <div style="padding:0 16px; margin-top:16px;">
+      <div class="font-display glow-blue" style="font-size:18px; text-align:center; margin-bottom:8px;">📊 輸入今日身體數據</div>
+    </div>
+    <div class="px-4 pb-6">
+      <div class="card-cyber">
+        <form id="body-form" style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <label style="font-size:13px; color:var(--blue); font-weight:700;">⚖️ 體重 (kg)</label>
+            <input class="input-cyber mt-1" name="weight" type="number" step="0.1" placeholder="例：65.5" required />
+          </div>
+          <div>
+            <label style="font-size:13px; color:var(--orange); font-weight:700;">🔥 體脂肪 (%)</label>
+            <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：22.5" required />
+          </div>
+          <div>
+            <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (kg)</label>
+            <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.0" required />
+          </div>
+          <div>
+            <label style="font-size:13px; color:#ffd166; font-weight:700;">🍔 內臟脂肪 (1-20)</label>
+            <input class="input-cyber mt-1" name="visceral" type="number" min="1" max="20" placeholder="例：6" required />
+          </div>
+          <button type="submit" class="btn-primary">送出今日數據</button>
+        </form>
+      </div>
+    </div>
+    ` : ''}
     `;
   },
 
@@ -3618,22 +3668,24 @@ function renderLogin() {
       if (!weightPhotoFile) return showToast('請上傳開賽前體重照片', 'error');
 
       const btn = $('#reg-submit');
-      btn.disabled = true; btn.textContent = '上傳照片中...';
+      btn.disabled = true;
+      const hideRegModal = showUploadingModal('⚖️ 上傳體重照片中...');
       try {
         const folderId = state.registerData.phone || 'unknown';
         const { photoUrl } = await uploadPhotoWithThumb(weightPhotoFile, `register/${folderId}`);
         weightPhotoUrl = photoUrl;
 
-        btn.textContent = '註冊中...';
         const newUser = await registerUser(state.registerData.phone, name, pwd, avatar, birthdate, gender, weightPhotoUrl);
         if (newUser?.id) {
           await sb.rpc('smr_set_user_pin', { p_user_id: newUser.id, p_pin: pin });
           await sb.rpc('smr_set_security_qa', { p_user_id: newUser.id, p_question: secQ, p_answer: secA });
         }
+        hideRegModal();
         showToast('🎉 歡迎加入！密碼已設定');
         state.page = 'home'; render();
         ensureCleanupFresh();
       } catch (e) {
+        hideRegModal();
         btn.disabled = false; btn.textContent = '完成註冊 · 開始挑戰';
         showToast(e.message || '註冊失敗', 'error');
       }
@@ -3843,9 +3895,9 @@ function renderAdmin() {
     const typed2 = window.prompt('最後確認，再次輸入 RESET：');
     if (typed2 !== 'RESET') return showToast('操作已取消', 'error');
     const btn = $('#ad-reset'); btn.disabled = true; btn.textContent = '重置中...';
-    const { data: r } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
+    const { data: r, error: rpcErr } = await sb.rpc('smr_admin_reset_competition', { p_pwd: state.adminPwd });
     btn.disabled = false; btn.textContent = '⚠️ 重置比賽（清除進度，保留帳號）';
-    if (!r?.ok) return showToast('重置失敗：' + (r?.error || '未知錯誤'), 'error');
+    if (rpcErr || !r?.ok) return showToast('重置失敗：' + (r?.error || rpcErr?.message || '未知錯誤'), 'error');
     showToast('✓ ' + r.msg);
     // 重設前端狀態，避免舊資料殘留
     await loadConfig();
@@ -3864,9 +3916,9 @@ function renderAdmin() {
     const typed2 = window.prompt('最後確認，再次輸入 DELETE ALL：');
     if (typed2 !== 'DELETE ALL') return showToast('操作已取消', 'error');
     const btn = $('#ad-delete-all-users'); btn.disabled = true; btn.textContent = '刪除中...';
-    const { data: r } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
+    const { data: r, error: rpcErr } = await sb.rpc('smr_admin_delete_all_users', { p_pwd: state.adminPwd });
     btn.disabled = false; btn.textContent = '🗑️ 刪除全部玩家帳號（完全清空）';
-    if (!r?.ok) return showToast('刪除失敗：' + (r?.error || '未知錯誤'), 'error');
+    if (rpcErr || !r?.ok) return showToast('刪除失敗：' + (r?.error || rpcErr?.message || '未知錯誤'), 'error');
     showToast('✅ ' + r.msg);
     await loadAdminData();
   };
@@ -4181,7 +4233,7 @@ function attachListeners() {
   if (state.page === 'home') {
     updateHomeHearts();
     renderFriendsGrid();
-    renderPokesCard();
+    renderPokeCycleCard();
     // 結賽驗證自動跳出（限第 28 天起 + 尚未提交）
     if (needsFinalVerification()) {
       setTimeout(() => openFinalVerificationModal(), 600);
@@ -4257,12 +4309,13 @@ function attachListeners() {
         $('#lunch-confirm').onclick = async () => {
           const btn = $('#lunch-confirm');
           btn.disabled = true;
-          btn.textContent = '上傳中...';
+          const hideModal = showUploadingModal('📸 照片上傳中...');
           try {
             const { photoUrl, thumbUrl } = await uploadPhotoWithThumb(lunchFile, state.user.id);
             await checkIn('lunch', photoUrl, thumbUrl);
           } catch (err) {
-            showToast(err.message || '上傳失敗', 'error');
+            hideModal();
+            showToast(err.message || '上傳失敗，請重試', 'error');
             btn.disabled = false;
             btn.textContent = '✓ 確認打卡';
           }
@@ -4315,6 +4368,15 @@ function attachListeners() {
         render();
       });
     });
+  }
+
+  if (state.page === 'records') {
+    const f = $('#body-form');
+    if (f) f.onsubmit = (e) => {
+      e.preventDefault();
+      const fd = new FormData(f);
+      submitBodyRecord(Object.fromEntries(fd));
+    };
   }
 }
 
