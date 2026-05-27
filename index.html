@@ -1106,7 +1106,7 @@ function openFinalVerificationModal() {
         <div style="background:var(--mint-l); border-radius:14px; padding:12px; border:1.5px dashed var(--mint);">
           <label style="font-size:13px; color:var(--primary); font-weight:900;">📷 體重秤照片（必填）</label>
           <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">拍下您現在站上體重秤的照片，作為結算憑證</div>
-          <input id="final-photo" type="file" accept="image/*" capture="environment" style="display:none;" />
+          <input id="final-photo" type="file" accept="image/*" style="display:none;" />
           <button type="button" id="final-photo-btn" class="btn-cyber" style="width:100%; margin-top:8px;">📸 拍照 / 選擇照片</button>
           <div id="final-photo-preview"></div>
         </div>
@@ -2358,7 +2358,7 @@ const pages = {
         return `<div class="card-cyber">
           <div style="font-weight:700; margin-bottom:8px;">☀️ 運動或健康餐打卡（每日一次）</div>
           <div style="font-size:11px; color:var(--ink-soft); margin-bottom:10px;">📸 上傳今日午餐照片即可打卡</div>
-          <input type="file" id="lunch-photo" accept="image/*" capture="environment" style="display:none;" />
+          <input type="file" id="lunch-photo" accept="image/*" style="display:none;" />
           <button class="btn-cyber" id="lunch-upload-btn" style="width:100%;">📷 拍照 / 選擇照片</button>
           <div id="lunch-preview" style="margin-top:10px;"></div>
         </div>`;
@@ -2483,12 +2483,12 @@ const pages = {
               <div style="display:flex; flex-direction:column; gap:10px;">
                 <div>
                   <label style="font-size:12px; color:var(--blue);">📷 面部照片（正面、自然光）</label>
-                  <input id="face-photo" type="file" accept="image/*" capture="user" class="input-cyber mt-1" style="padding:8px;" />
+                  <input id="face-photo" type="file" accept="image/*" class="input-cyber mt-1" style="padding:8px;" />
                   <div id="face-preview"></div>
                 </div>
                 <div>
                   <label style="font-size:12px; color:var(--blue);">👅 舌診照片（伸舌、自然光）</label>
-                  <input id="tongue-photo" type="file" accept="image/*" capture="user" class="input-cyber mt-1" style="padding:8px;" />
+                  <input id="tongue-photo" type="file" accept="image/*" class="input-cyber mt-1" style="padding:8px;" />
                   <div id="tongue-preview"></div>
                 </div>
               </div>
@@ -3630,7 +3630,7 @@ function renderLogin() {
             <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">
               拍下您現在站上體重秤的照片，比賽結束會作為對比基準
             </div>
-            <input id="reg-weight-photo" type="file" accept="image/*" capture="environment" style="display:none;" />
+            <input id="reg-weight-photo" type="file" accept="image/*" style="display:none;" />
             <button type="button" id="reg-weight-btn" class="btn-cyber" style="width:100%; margin-top:10px;">📸 拍照 / 選擇照片</button>
             <div id="reg-weight-preview"></div>
           </div>
