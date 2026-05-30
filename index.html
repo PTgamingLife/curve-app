@@ -584,6 +584,7 @@ const state = {
   pokesReceived: [],
   pokeIndex: 0,
   pokeMap: {},
+  extraWeightPhotos: [],
 };
 
 // 8 個人物頭像：男女各 4，不同髮型/膚色
@@ -2985,6 +2986,82 @@ function reportCard(rec, rOrPrev) {
   `;
 }
 
+async function loadExtraWeightPhotos() {
+  if (!state.user) return;
+  const { data } = await sb.from('smr_extra_weight_photos')
+    .select('id, photo_url, thumb_url, created_at')
+    .eq('user_id', state.user.id)
+    .order('created_at', { ascending: true });
+  state.extraWeightPhotos = data || [];
+}
+
+async function renderExtraWeightPhotosSection() {
+  const wrap = document.getElementById('extra-weight-section');
+  if (!wrap) return;
+  await loadExtraWeightPhotos();
+  const photos = state.extraWeightPhotos;
+  const canAdd = photos.length < 3;
+
+  wrap.innerHTML = `
+    <div style="margin:0 16px 12px;">
+      ${photos.length ? `
+        <div style="font-size:11px; color:var(--ink-soft); font-weight:700; margin-bottom:8px;">📎 補充照片（${photos.length}/3）</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${photos.map(p => `
+            <div style="position:relative; width:calc(33% - 6px);">
+              <img src="${p.thumb_url || p.photo_url}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; background:var(--bg-soft);"/>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      ${canAdd ? `
+        <input id="extra-weight-input" type="file" accept="image/*" style="display:none;"/>
+        <button id="extra-weight-btn" style="
+          margin-top:${photos.length ? '10px' : '0'};
+          display:flex; align-items:center; justify-content:center; gap:6px;
+          width:100%; padding:10px; border-radius:12px;
+          border:2px dashed var(--mint); background:var(--mint-l);
+          color:var(--ink); font-size:13px; font-weight:700; cursor:pointer;
+        ">➕ 新增開賽前體重照片（最多 3 張）</button>
+      ` : `
+        <div style="margin-top:8px; font-size:11px; color:var(--ink-soft); text-align:center;">已達上限（3 張）</div>
+      `}
+    </div>
+  `;
+
+  const btn = document.getElementById('extra-weight-btn');
+  const inp = document.getElementById('extra-weight-input');
+  if (btn && inp) {
+    btn.onclick = () => inp.click();
+    inp.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await uploadExtraWeightPhoto(file);
+    };
+  }
+}
+
+async function uploadExtraWeightPhoto(file) {
+  const btn = document.getElementById('extra-weight-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '上傳中...'; }
+  const hideModal = showUploadingModal('📷 上傳補充照片中...');
+  try {
+    const { photoUrl, thumbUrl } = await uploadPhotoWithThumb(file, state.user.id);
+    await sb.from('smr_extra_weight_photos').insert({
+      user_id: state.user.id,
+      photo_url: photoUrl,
+      thumb_url: thumbUrl,
+    });
+    hideModal();
+    showToast('✅ 照片已新增');
+    await renderExtraWeightPhotosSection();
+  } catch (err) {
+    hideModal();
+    if (btn) { btn.disabled = false; btn.textContent = '➕ 新增開賽前體重照片（最多 3 張）'; }
+    showToast(err.message || '上傳失敗', 'error');
+  }
+}
+
 function renderFinalSummaryCard() {
   const u = state.user;
   if (!u) return '';
@@ -3060,6 +3137,7 @@ function renderFinalSummaryCard() {
         ${isCompetitionEnded() ? '⏳ 等待您提交最終結算' : `比賽進行中 · Day ${gameDay()}/28`}
       </div>
     </div>
+    <div id="extra-weight-section"></div>
   ` : '';
 
   return finalCard + startOnlyCard;
@@ -4432,6 +4510,7 @@ function attachListeners() {
       const fd = new FormData(f);
       submitBodyRecord(Object.fromEntries(fd));
     };
+    renderExtraWeightPhotosSection();
   }
 }
 
