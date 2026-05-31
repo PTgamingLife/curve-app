@@ -1096,8 +1096,8 @@ function openFinalVerificationModal() {
           <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：20.5" required />
         </div>
         <div>
-          <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 最終肌肉量 (kg)</label>
-          <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.5" required />
+          <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 最終肌肉量 (%)</label>
+          <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：35.0" required />
         </div>
         <div>
           <label style="font-size:13px; color:#E5A600; font-weight:700;">🍔 最終內臟脂肪 (1-20)</label>
@@ -1636,7 +1636,7 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
   // 體組成標準
   const stdVisceral = userGender === 'male' ? '4-6' : '2-4';
   const stdFat = userGender === 'male' ? '18-20%' : '20-25%';
-  const stdMuscle = userGender === 'male' ? '32-36kg' : '28-32kg';
+  const stdMuscle = userGender === 'male' ? '33-40%' : '28-35%';
 
   const prompt = `你是一位精通中醫面診/舌診/體組成分析的養生顧問，整合以下知識體系：
 1. 長庚醫院舌診資料庫研究（CCMP96-RD-005）
@@ -1649,7 +1649,7 @@ async function callClaudeAI(facePhoto, tonguePhoto, bodyData) {
 - 年齡：${userAge} 歲（生日 ${userBirth}）
 - 體重：${bodyData.weight} kg
 - 體脂率：${bodyData.body_fat}%（標準 ${stdFat}）
-- 肌肉量：${bodyData.muscle} kg（標準 ${stdMuscle}）
+- 肌肉量：${bodyData.muscle}%（標準 ${stdMuscle}）
 - 內臟脂肪：${bodyData.visceral}（標準 ${stdVisceral}）
 
 【體組成判讀邏輯 — 必須先用這個規則決定 bodyComposition.organConcern】
@@ -2178,10 +2178,10 @@ function generateReport(rec, prevRec) {
   // CID 判定（簡化：以體脂與肌肉量綜合）
   let cid = 'I型', cidDesc = '均衡型，健康基礎好';
   if (fat > 25 && muscle < 30) { cid = 'C型'; cidDesc = '脂肪偏多、肌肉量需提升，代謝症候群風險需注意'; }
-  else if (muscle > 36) { cid = 'D型'; cidDesc = '肌肉量充足、代謝強，注意熱量控制'; }
+  else if (muscle > 40) { cid = 'D型'; cidDesc = '肌肉量充足、代謝強，注意熱量控制'; }
 
   const fatStatus = fat > 25 ? '⚠️ 偏高' : fat < 18 ? '⚠️ 偏低' : '✅ 正常';
-  const muscleStatus = muscle < 28 ? '⚠️ 偏低' : '✅ 正常';
+  const muscleStatus = muscle < 30 ? '⚠️ 偏低' : '✅ 正常';
   const visceralStatus = visceral > 9 ? '⚠️ 偏高' : visceral < 2 ? '⚠️ 偏低' : '✅ 正常';
 
   const trend = prevRec ? (fat - prevRec.body_fat_pct).toFixed(1) : null;
@@ -2194,7 +2194,7 @@ function generateReport(rec, prevRec) {
     warnings: [
       visceral > 9 && '內臟脂肪偏高，建議肝功能追蹤、控制精緻碳水',
       fat > 30 && '體脂率過高，注意心血管風險',
-      muscle < 25 && '肌肉量過低，加強阻力訓練',
+      muscle < 30 && '肌肉量過低，加強阻力訓練',
     ].filter(Boolean),
   };
 }
@@ -2470,8 +2470,8 @@ const pages = {
             <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：22.5" required />
           </div>
           <div>
-            <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (kg)</label>
-            <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.0" required />
+            <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (%)</label>
+            <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：35.0" required />
           </div>
           <div>
             <label style="font-size:13px; color:#ffd166; font-weight:700;">🍔 內臟脂肪 (1-20)</label>
@@ -2540,8 +2540,8 @@ const pages = {
             <input class="input-cyber mt-1" name="body_fat" type="number" step="0.1" placeholder="例：22.5" required />
           </div>
           <div>
-            <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (kg)</label>
-            <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：32.0" required />
+            <label style="font-size:13px; color:#4caf50; font-weight:700;">💪 肌肉量 (%)</label>
+            <input class="input-cyber mt-1" name="muscle" type="number" step="0.1" placeholder="例：35.0" required />
           </div>
           <div>
             <label style="font-size:13px; color:#ffd166; font-weight:700;">🍔 內臟脂肪 (1-20)</label>
@@ -2673,7 +2673,7 @@ function aiReportCard(rep) {
       </div>
       <div style="background:var(--bg); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.muscleStatus)};">
         <div style="font-size:10px; color:var(--ink-soft);">肌肉量 ${bc.muscleStatus || ''}</div>
-        <div class="font-display" style="font-size:20px; color:${valColor(bc.muscleStatus)};">${bc.muscle || '—'} <span style="font-size:11px;">kg</span></div>
+        <div class="font-display" style="font-size:20px; color:${valColor(bc.muscleStatus)};">${bc.muscle || '—'} <span style="font-size:11px;">%</span></div>
       </div>
       <div style="background:var(--bg); padding:8px 10px; border-radius:8px; border-left:3px solid ${valColor(bc.visceralStatus)};">
         <div style="font-size:10px; color:var(--ink-soft);">內臟脂肪 ${bc.visceralStatus || ''}</div>
@@ -2942,7 +2942,7 @@ function reportCard(rec, rOrPrev) {
         <span>體脂率 ${r.fatStatus}</span><span class="font-display glow-orange">${rec.body_fat_pct}%</span>
       </div>
       <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg); border-radius:8px;">
-        <span>肌肉量 ${r.muscleStatus}</span><span class="font-display" style="color:#4caf50; text-shadow:0 0 12px #4caf50;">${rec.muscle_mass} kg</span>
+        <span>肌肉量 ${r.muscleStatus}</span><span class="font-display" style="color:#4caf50; text-shadow:0 0 12px #4caf50;">${rec.muscle_mass}%</span>
       </div>
       <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg); border-radius:8px;">
         <span>內臟脂肪 ${r.visceralStatus}</span><span class="font-display glow-gold">Lv ${rec.visceral_fat}</span>
@@ -3114,7 +3114,7 @@ function renderFinalSummaryCard() {
           <div style="background:#fff; border-radius:12px; padding:10px 12px; font-size:13px; line-height:1.8;">
             <div style="font-size:11px; color:var(--ink-soft); font-weight:700; margin-bottom:4px;">📊 28 天進步幅度</div>
             體重 ${fmt(wDiff,'kg',true)} · 體脂 ${fmt(fDiff,'%',true)}<br>
-            肌肉 ${fmt(mDiff,'kg',false)} · 內臟脂肪 ${fmt(vDiff,'',true)}
+            肌肉 ${fmt(mDiff,'%',false)} · 內臟脂肪 ${fmt(vDiff,'',true)}
           </div>
         `;
       })() : ''}
