@@ -4445,6 +4445,7 @@ function attachListeners() {
           const hideModal = showUploadingModal('📸 照片上傳中...');
           try {
             const { photoUrl, thumbUrl } = await uploadPhotoWithThumb(lunchFile, state.user.id);
+            hideModal();
             await checkIn('lunch', photoUrl, thumbUrl);
           } catch (err) {
             hideModal();
